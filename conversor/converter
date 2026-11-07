@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Atalho: roda o conversor com o ambiente Python desta pasta.
+AQUI="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+if [ ! -x "$AQUI/.venv/bin/python" ]; then
+  echo "Rode primeiro: $AQUI/instalar.sh"; exit 1
+fi
+exec "$AQUI/.venv/bin/python" "$AQUI/converter.py" "$@"

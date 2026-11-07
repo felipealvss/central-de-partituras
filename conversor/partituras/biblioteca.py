@@ -296,6 +296,11 @@ class Biblioteca:
             m['checklist'] = {k: bool((valor or {}).get(k)) for k in CHECKLIST}
         elif chave == 'revisada':
             m['revisada'] = bool(valor)
+            if valor and not (m.get('final') or {}).get('publicados'):
+                versao = next((c['versoes'][-1] for c in reversed(m['conversoes']) if c.get('versoes')), None)
+                if versao and versao.get('publicados'):
+                    m['final'] = {'origem': 'Rascunho revisado no MuseScore', 'quando': agora(),
+                                  'publicados': versao['publicados']}
             m['estado'] = 'revisada' if valor else self._estado_da_ultima(m)
         else:
             raise Invalido(f'Campo desconhecido: {chave}')
@@ -404,6 +409,16 @@ class Biblioteca:
         if ultima['estado'] == 'erro' or not ultima['versoes']:
             return 'erro'
         return 'rascunho_alertas' if ultima['versoes'][-1]['resumo'].get('alertas') else 'rascunho'
+
+    def registrar_revisao(self, mid, resultado):
+        """Guarda o pacote de revisão com o Claude mais recente (pasta e pedido para colar)."""
+        with self._trava:
+            m = self.ler(mid)
+            m.setdefault('revisoes', []).append({'quando': agora(), 'ok': bool(resultado.get('ok')),
+                                                 'pasta': resultado.get('pasta'), 'pedido': resultado.get('pedido'),
+                                                 'erro': resultado.get('erro')})
+            m['revisao'] += 1
+            return self._salvar(m)
 
     def conferencia(self, mid, cid, versao):
         arq = self.pasta_conversao(mid, cid) / 'versoes' / f'{int(versao):02d}' / 'conferencia.json'

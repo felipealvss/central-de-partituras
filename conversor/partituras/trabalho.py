@@ -23,6 +23,9 @@ def executar(tarefa):
     def progresso(etapa, msg, i=None, n=None):
         emitir(etapa=etapa, msg=msg, i=i, n=n)
 
+    if tarefa.get('tipo') == 'revisao':
+        from . import revisao
+        return revisao.montar(tarefa, progresso)
     opcoes = pipeline.Opcoes.de_dict(tarefa.get('opcoes'))
     conv = Path(tarefa['conv'])
     if tarefa.get('tipo', 'converter') == 'converter':

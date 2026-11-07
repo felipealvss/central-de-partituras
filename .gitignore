@@ -6,17 +6,17 @@ __pycache__/
 *.pyc
 
 # Estado interno do aplicativo (trava, perfil do navegador, arquivos de trabalho)
-.estado/
+/.estado/
 
 # Dados das músicas (fotos, conversões, saídas). Faça backup destas pastas à parte.
-entrada/
-partituras/
-exportados/
-musicas/*/paginas/
-musicas/*/.miniaturas/
-musicas/*/conversoes/
-musicas/*/revisao/
-musicas/*/musica.json
+/entrada/
+/partituras/
+/exportados/
+/musicas/*/paginas/
+/musicas/*/.miniaturas/
+/musicas/*/conversoes/
+/musicas/*/revisao/
+/musicas/*/musica.json
 
 # Gerado a partir do MANUAL.md
-MANUAL.pdf
+/MANUAL.pdf

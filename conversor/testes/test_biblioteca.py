@@ -9,7 +9,7 @@ from PIL import Image
 
 from partituras import fotos
 from partituras.biblioteca import Biblioteca, Conflito, Invalido
-from testes.util import RAIZ_PROJETO, temporaria
+from testes.util import dado, temporaria
 
 
 def jpeg(hora=None, cor='white'):
@@ -40,10 +40,7 @@ class TestFotos(unittest.TestCase):
         self.assertEqual((hora.second, origem), (59, 'nome'))
 
     def test_heic_real_do_celular(self):
-        p = RAIZ_PROJETO / 'musicas' / 'my-savior-and-my-son' / 'paginas' / '20261107_094652.heic'
-        if not p.exists():
-            self.skipTest('foto real não disponível')
-        hora, origem = fotos.hora_da_foto(p)
+        hora, origem = fotos.hora_da_foto(dado('foto-celular.heic'))
         self.assertEqual((hora.hour, hora.minute, hora.second, origem), (9, 46, 52, 'exif'))
 
     def test_grupos_por_intervalo(self):

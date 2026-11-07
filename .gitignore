@@ -8,6 +8,7 @@
 /*
 !/.gitignore
 !/README.md
+!/LICENSE
 !/MANUAL.md
 !/abrir-conversor.sh
 !/conversor/
@@ -17,8 +18,9 @@
 /conversor/audiveris/
 /conversor/tessdata/
 
-# Leituras reais de uma partitura protegida por direitos autorais, usadas
-# como referência nos testes. Sem elas, esses testes são pulados.
+# Dados reais de uma partitura protegida por direitos autorais (foto, leituras
+# dos motores, transcrição), usados como referência nos testes. Sem eles,
+# esses testes são pulados.
 /conversor/testes/dados/
 
 # Gerados pelo Python

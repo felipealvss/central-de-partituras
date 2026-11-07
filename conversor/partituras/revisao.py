@@ -1,4 +1,4 @@
-"""Pacote de revisão assistida pelo Claude — o processo que gerou a versão revisada de My Savior.
+"""Pacote de revisão assistida pelo Claude — o mesmo processo da versão revisada citada no manual.
 
 Gera musicas/<id>/revisao/<data-hora>/ com: fotos em JPEG (o Claude não lê HEIC), guias de altura (o Audiveris
 localiza as pautas), o rascunho mais recente (MusicXML e listado compasso a compasso), a conferência e um
@@ -51,8 +51,7 @@ Cole no Claude Code (aberto na pasta do programa, a que tem o `abrir-conversor.s
 > Revise a música em `{rel}` seguindo o PEDIDO.md dessa pasta.
 
 ## O que fazer
-Comparar o rascunho com as fotos, compasso a compasso, e escrever a transcrição final em notação compacta
-(o mesmo processo usado em My Savior and My Son).
+Comparar o rascunho com as fotos, compasso a compasso, e escrever a transcrição final em notação compacta.
 
 1. Para cada sistema, use as imagens de `guias/` (clave de {clave}): as linhas suplementares têm o nome da
    nota desenhado (Mi2, Dó2, Lá1…). Conte as linhas pela guia, não no olho.

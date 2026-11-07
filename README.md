@@ -35,3 +35,7 @@ Suas fotos, músicas e partituras ficam nas pastas `entrada/`, `musicas/`, `part
 ## Para quem for mexer no código
 
 Estrutura, linha de comando e testes: [conversor/README.md](conversor/README.md).
+
+## Licença
+
+Código sob a [licença MIT](LICENSE). O homr e o Audiveris, que o instalador baixa, são programas separados, com licença própria (AGPL-3.0).

@@ -4,7 +4,6 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 DADOS = Path(__file__).resolve().parent / 'dados'
-RAIZ_PROJETO = Path(__file__).resolve().parents[2]
 
 
 def dado(nome):

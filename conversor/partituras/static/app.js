@@ -366,7 +366,7 @@ function blocoDados(m) {
   return el('section', { class: 'bloco' }, el('h3', { text: 'Dados da música' }),
     el('div', { class: 'grade-campos' },
       campoTexto(m, 'instrumento', 'Instrumento ou parte', { placeholder: 'Ex.: Trombone 3 / Tuba' }),
-      campoTexto(m, 'compositor', 'Compositor / arranjo', { placeholder: 'Ex.: Joel Lindsey / arr. B. Knight' }),
+      campoTexto(m, 'compositor', 'Compositor / arranjo', { placeholder: 'Ex.: compositor / arr. arranjador' }),
       campoTexto(m, 'ultimo_compasso', 'Último número de compasso impresso', { type: 'number', min: 1, placeholder: 'Ex.: 165 (confere o total)' }),
       el('div', {}, el('label', { class: 'rotulo', for: 'c-clave', text: 'Clave (para as guias de altura)' }),
         el('select', { class: 'campo', id: 'c-clave', onchange: e => salvar(m, { clave: e.target.value }) },
@@ -706,7 +706,7 @@ function blocoRevisaoClaude(m) {
   const ultima = (m.revisoes || [])[(m.revisoes || []).length - 1];
   const naFila = (est.fila.atual && est.fila.atual.musica === m.id && est.fila.atual.tipo === 'revisao') ||
     est.fila.fila.some(j => j.musica === m.id && j.tipo === 'revisao');
-  const corpo = [el('p', { class: 'apagado pequeno', text: 'Monta um pacote com as fotos, guias de altura, o rascunho e um pedido pronto. Você cola o pedido no Claude Code, que revisa compasso a compasso — o processo que gerou a versão revisada de My Savior and My Son.' })];
+  const corpo = [el('p', { class: 'apagado pequeno', text: 'Monta um pacote com as fotos, guias de altura, o rascunho e um pedido pronto. Você cola o pedido no Claude Code, que revisa compasso a compasso — o mesmo processo da versão revisada citada no manual.' })];
   if (ultima && ultima.ok) {
     corpo.push(el('p', {}, el('strong', { text: 'Pacote pronto ' }), el('span', { class: 'apagado pequeno', text: hora(ultima.quando) })),
       el('div', { class: 'barra-acoes' },

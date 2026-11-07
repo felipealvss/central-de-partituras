@@ -11,7 +11,7 @@ from partituras import conferencia
 from partituras import musicxml as mx
 from partituras import notacao, processos, publicar
 from partituras.erros import ErroConversao
-from testes.util import RAIZ_PROJETO, dado, homr_unido, temporaria
+from testes.util import dado, homr_unido, temporaria
 
 
 def _referencia(nome):
@@ -109,11 +109,8 @@ class TestProcessos(unittest.TestCase):
 
 
 class TestNotacao(unittest.TestCase):
-    def test_transcricao_de_my_savior_identica(self):
-        arquivo = RAIZ_PROJETO / 'musicas' / 'my-savior-and-my-son' / 'transcricao' / 'transcricao.py'
-        if not arquivo.exists():
-            self.skipTest('transcrição de My Savior não está na pasta musicas/')
-        p = notacao.carregar_transcricao(arquivo)
+    def test_transcricao_revisada_identica(self):
+        p = notacao.carregar_transcricao(dado('transcricao-revisada.py'))
         self.assertEqual(p.musicxml(), dado('revisada.musicxml').read_text(encoding='utf-8'))
 
     def test_duracao_errada_e_apontada(self):

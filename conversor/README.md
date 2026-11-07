@@ -38,7 +38,7 @@ Tudo fica dentro desta pasta: `.venv/` (Python 3.14 com homr, Flask, waitress…
 .venv/bin/python -m unittest discover -s testes -v
 ```
 
-As referências em `testes/dados/` são leituras reais de uma partitura protegida por direitos autorais (homr, Audiveris e a transcrição revisada) e não vão para o repositório. Sem elas, os testes que as usam são pulados; os demais rodam normalmente.
+As referências em `testes/dados/` são leituras reais de uma partitura protegida por direitos autorais (uma foto de celular, as leituras do homr e do Audiveris e a transcrição revisada) e não vão para o repositório. Sem elas, os testes que as usam são pulados; os demais rodam normalmente.
 
 Cobrem: pausas longas nos formatos do homr e do Audiveris; ligaduras de valor com acidente; correção dos trechos de pausa (com os números certos, o resultado do homr bate 33/33 compassos com notas com a transcrição revisada); conferência igual à de referência; publicação sem sobrescrever (inclusive em sistema de arquivos sem links); cancelamento que encerra processos-netos; biblioteca com edição concorrente; servidor (ficha, `Host`, cabeçalho, caminhos com `../`); fila com trabalhador falso; .zip.
 

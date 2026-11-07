@@ -6,7 +6,7 @@ A Central transforma fotos do celular (ou PDFs) de partituras em arquivos do **M
 
 O reconhecimento automático gera um **rascunho**. A Central corrige o que dá para corrigir sozinha e aponta onde conferir; a versão final sai da sua revisão no MuseScore (ou da revisão com o Claude, seção 12).
 
-O que mostrou o teste com *My Savior and My Son* (Trombone 3 / Tuba, 2 fotos, 165 compassos):
+O que mostrou o teste com uma música real (Trombone 3 / Tuba, 2 fotos, 165 compassos):
 
 | Etapa | Resultado |
 |---|---|
@@ -15,7 +15,7 @@ O que mostrou o teste com *My Savior and My Son* (Trombone 3 / Tuba, 2 fotos, 16
 | Você digita os números das pausas | 165 compassos e as notas iguais à versão revisada, compasso a compasso |
 | Falta acrescentar no MuseScore | dinâmicas, andamentos, *rit.*/*a tempo*, fermatas e parte dos acentos |
 
-A versão revisada de *My Savior and My Son* usada nessa comparação foi feita por **transcrição assistida pelo Claude**, conferida compasso a compasso — nenhum programa de reconhecimento gerou aquele arquivo sozinho.
+A versão revisada usada nessa comparação foi feita por **transcrição assistida pelo Claude**, conferida compasso a compasso — nenhum programa de reconhecimento gerou aquele arquivo sozinho.
 
 ## 2. Abrir o programa
 
@@ -124,7 +124,7 @@ Depois marque o **checklist de revisão** na Central e clique em **✓ Marcar co
 
 ## 12. Revisão com o Claude
 
-Para músicas importantes ou difíceis, a Central prepara tudo para uma revisão assistida — o mesmo processo que gerou a versão revisada de *My Savior and My Son*:
+Para músicas importantes ou difíceis, a Central prepara tudo para uma revisão assistida — o mesmo processo que gerou a versão revisada desse teste:
 
 1. Clique em **Preparar pacote de revisão** (≈1 minuto). O pacote tem as fotos em JPEG, as guias de altura, o rascunho listado compasso a compasso, o relatório e um `PEDIDO.md`.
 2. Clique em **Copiar pedido**.

@@ -1,8 +1,8 @@
-"""Onde ficam as coisas. Tudo dentro de image-to-music/ (a raiz pode ser trocada para testes)."""
+"""Onde ficam as coisas. Tudo dentro da pasta do programa (a raiz pode ser trocada para testes)."""
 import os
 from pathlib import Path
 
-CONVERSOR = Path(__file__).resolve().parent.parent            # image-to-music/conversor
+CONVERSOR = Path(__file__).resolve().parent.parent            # <pasta do programa>/conversor
 RAIZ = Path(os.environ.get('CENTRAL_PARTITURAS_RAIZ') or CONVERSOR.parent).resolve()
 
 ESTADO = RAIZ / '.estado'           # trava do servidor, perfil do navegador, dados do Audiveris, trabalho

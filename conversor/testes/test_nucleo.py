@@ -11,11 +11,11 @@ from partituras import conferencia
 from partituras import musicxml as mx
 from partituras import notacao, processos, publicar
 from partituras.erros import ErroConversao
-from testes.util import DADOS, RAIZ_PROJETO, homr_unido, temporaria
+from testes.util import RAIZ_PROJETO, dado, homr_unido, temporaria
 
 
 def _referencia(nome):
-    texto = (DADOS / nome).read_text(encoding='utf-8')
+    texto = dado(nome).read_text(encoding='utf-8')
     pausas = re.search(r'\n  (c\.\d+: \d+(?:, c\.\d+: \d+)*)\n', texto).group(1)
     so_pausa = texto.split('Compassos só com pausa')[1].splitlines()[1].strip()
     return pausas, so_pausa
@@ -39,7 +39,7 @@ class TestConferencia(unittest.TestCase):
         self.assertEqual(rel['duracao_errada'], [])
 
     def test_audiveris_igual_a_referencia(self):
-        rel = self._comparar(mx.ler(DADOS / 'audiveris.mxl'), 'referencia-audiveris.txt', 'audiveris')
+        rel = self._comparar(mx.ler(dado('audiveris.mxl')), 'referencia-audiveris.txt', 'audiveris')
         self.assertEqual(rel['total'], 76)
         self.assertEqual([(c['n'], c['tempos']) for c in rel['duracao_errada']], [(54, 3)])
         self.assertTrue(rel['suspeitos'])
@@ -114,7 +114,7 @@ class TestNotacao(unittest.TestCase):
         if not arquivo.exists():
             self.skipTest('transcrição de My Savior não está na pasta musicas/')
         p = notacao.carregar_transcricao(arquivo)
-        self.assertEqual(p.musicxml(), (DADOS / 'revisada.musicxml').read_text(encoding='utf-8'))
+        self.assertEqual(p.musicxml(), dado('revisada.musicxml').read_text(encoding='utf-8'))
 
     def test_duracao_errada_e_apontada(self):
         p = notacao.Partitura('X')

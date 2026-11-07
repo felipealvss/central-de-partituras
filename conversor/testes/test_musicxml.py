@@ -1,7 +1,7 @@
 import unittest
 
 from partituras import musicxml as mx
-from testes.util import DADOS, assinatura, homr_unido, partitura
+from testes.util import assinatura, dado, homr_unido, partitura
 
 
 class TestPaginasEPausas(unittest.TestCase):
@@ -11,7 +11,7 @@ class TestPaginasEPausas(unittest.TestCase):
         self.assertEqual(len(mx.partes(t)[0].findall('measure')), 93)
 
     def test_audiveris_mantem_76(self):
-        t = mx.ler(DADOS / 'audiveris.mxl')
+        t = mx.ler(dado('audiveris.mxl'))
         mx.normalizar_multirests(t)
         self.assertEqual(len(mx.partes(t)[0].findall('measure')), 76)
 
@@ -65,7 +65,7 @@ class TestTrechosDePausa(unittest.TestCase):
         mx.normalizar_multirests(t)
         mx.ligaduras_de_valor(t)
         trechos = mx.trechos_de_pausa(t)
-        revisada = mx.ler(DADOS / 'revisada.musicxml')
+        revisada = mx.ler(dado('revisada.musicxml'))
         certos = mx.trechos_de_pausa(revisada)
         self.assertEqual(len(trechos), len(certos))
         mx.corrigir_trechos(t, {a['indice']: b['lidos'] for a, b in zip(trechos, certos)})
@@ -110,7 +110,7 @@ class TestTrechosDePausa(unittest.TestCase):
 
 class TestCabecalho(unittest.TestCase):
     def test_remove_ocr_e_define_textos(self):
-        t = mx.ler(DADOS / 'audiveris.mxl')
+        t = mx.ler(dado('audiveris.mxl'))
         textos = mx.ajustar(t, 'Título', 'Trombone', 'Fulano')
         raiz = t.getroot()
         self.assertTrue(textos)

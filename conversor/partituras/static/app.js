@@ -711,7 +711,7 @@ function blocoRevisaoClaude(m) {
     corpo.push(el('p', {}, el('strong', { text: 'Pacote pronto ' }), el('span', { class: 'apagado pequeno', text: hora(ultima.quando) })),
       el('div', { class: 'barra-acoes' },
         el('button', { class: 'botao primario', onclick: () => navigator.clipboard.writeText(ultima.pedido)
-          .then(() => aviso('Pedido copiado. Cole no Claude Code aberto na pasta image-to-music.', 'ok')).catch(falhou) }, 'Copiar pedido'),
+          .then(() => aviso('Pedido copiado. Cole no Claude Code aberto na pasta do programa.', 'ok')).catch(falhou) }, 'Copiar pedido'),
         el('button', { class: 'botao', onclick: () => api('POST', `/api/musicas/${enc(m.id)}/abrir-revisao`).catch(falhou) }, 'Abrir pasta do pacote')));
   } else if (ultima && !ultima.ok) {
     corpo.push(el('div', { class: 'erro-cartao', text: `O último pacote falhou: ${ultima.erro || 'erro desconhecido'}` }));

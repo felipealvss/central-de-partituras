@@ -1,4 +1,5 @@
 """Utilidades dos testes: dados de referência reais e MusicXML mínimo."""
+import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -6,9 +7,18 @@ DADOS = Path(__file__).resolve().parent / 'dados'
 RAIZ_PROJETO = Path(__file__).resolve().parents[2]
 
 
+def dado(nome):
+    """Arquivo de referência em testes/dados/. São leituras reais de uma partitura protegida por direitos
+    autorais e por isso não vão para o repositório: sem o arquivo, o teste é pulado."""
+    p = DADOS / nome
+    if not p.exists():
+        raise unittest.SkipTest(f'sem o dado de referência testes/dados/{nome} (fica fora do repositório)')
+    return p
+
+
 def homr_unido():
     from partituras import musicxml as mx
-    return mx.unir_paginas([mx.ler(DADOS / 'homr-pagina1.musicxml'), mx.ler(DADOS / 'homr-pagina2.musicxml')])
+    return mx.unir_paginas([mx.ler(dado('homr-pagina1.musicxml')), mx.ler(dado('homr-pagina2.musicxml'))])
 
 
 def assinatura(m):

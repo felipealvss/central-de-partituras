@@ -67,7 +67,7 @@ def criar_app(b, fila, token):
             return erro(403, 'Acesso negado. Abra a Central pelo atalho.')
         return ('<meta charset="utf-8"><body style="font-family:system-ui;padding:2rem">'
                 '<h2>Central de Partituras</h2><p>Abra pelo atalho <b>Central de Partituras</b> '
-                'ou rode <code>abrir-conversor.sh</code> na pasta image-to-music.</p></body>', 403)
+                'ou rode <code>abrir-conversor.sh</code> na pasta do programa.</p></body>', 403)
 
     app.register_error_handler(NaoEncontrado, lambda e: erro(404, str(e)))
     app.register_error_handler(Invalido, lambda e: erro(400, str(e)))

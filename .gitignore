@@ -1,22 +1,33 @@
-# Motores e ambiente Python: reinstaláveis com conversor/instalar.sh
-conversor/.venv/
-conversor/audiveris/
-conversor/tessdata/
+# Central de Partituras: o repositório leva só o aplicativo e a documentação.
+# Fotos, músicas, partituras geradas, o estado do programa e o que o
+# instalar.sh baixa ficam só no computador.
+
+# Raiz: tudo fica de fora, menos o que está liberado com "!".
+# (Ficam de fora, por exemplo: entrada/, musicas/, partituras/, exportados/,
+#  .estado/ e o MANUAL.pdf, que é gerado a partir do MANUAL.md.)
+/*
+!/.gitignore
+!/README.md
+!/MANUAL.md
+!/abrir-conversor.sh
+!/conversor/
+
+# Baixado ou criado pelo conversor/instalar.sh
+/conversor/.venv/
+/conversor/audiveris/
+/conversor/tessdata/
+
+# Leituras reais de uma partitura protegida por direitos autorais, usadas
+# como referência nos testes. Sem elas, esses testes são pulados.
+/conversor/testes/dados/
+
+# Gerados pelo Python
 __pycache__/
-*.pyc
+*.py[cod]
 
-# Estado interno do aplicativo (trava, perfil do navegador, arquivos de trabalho)
-/.estado/
-
-# Dados das músicas (fotos, conversões, saídas). Faça backup destas pastas à parte.
-/entrada/
-/partituras/
-/exportados/
-/musicas/*/paginas/
-/musicas/*/.miniaturas/
-/musicas/*/conversoes/
-/musicas/*/revisao/
-/musicas/*/musica.json
-
-# Gerado a partir do MANUAL.md
-/MANUAL.pdf
+# Editores e sistema
+*~
+*.swp
+.vscode/
+.idea/
+.DS_Store

@@ -46,7 +46,7 @@ def listar_compassos(arvore):
 
 PEDIDO = """# Pedido de revisão — {titulo}{instr}
 
-Cole no Claude Code (aberto na pasta image-to-music):
+Cole no Claude Code (aberto na pasta do programa, a que tem o `abrir-conversor.sh`):
 
 > Revise a música em `{rel}` seguindo o PEDIDO.md dessa pasta.
 
@@ -59,7 +59,7 @@ Comparar o rascunho com as fotos, compasso a compasso, e escrever a transcriçã
 2. Confira contra `rascunho-por-compasso.txt` (o que o {motor} leu, já com ligaduras e pausas corrigidas).
    As notas pretas costumam estar certas; confira semibreves graves, pausas longas, acidentes e ligaduras.
 3. Escreva a transcrição em `{transcricao}` (arquivo novo, com data: não apague transcrições anteriores) usando `conversor/partituras/notacao.py`
-   (exemplo completo: `musicas/my-savior-and-my-son/transcricao/transcricao.py`).
+   (o formato está descrito no início desse arquivo; transcrições anteriores em `musicas/*/transcricao/` servem de exemplo).
    Inclua dinâmicas, andamentos, rit./a tempo, forquilhas, articulações, fermatas e barras duplas.
 4. Gere e confira (na pasta conversor/):
    `.venv/bin/python -m partituras.notacao ../{transcricao} -o ../{saida_xml} --mscz "{saida_mscz}" --pdf`

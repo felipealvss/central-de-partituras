@@ -1,6 +1,6 @@
 # Central de Partituras — manual de uso
 
-A Central transforma fotos do celular (ou PDFs) de partituras em arquivos do **MuseScore** (`.mscz`), organiza as músicas e ajuda a revisar o resultado. Tudo roda no seu computador e fica na pasta `image-to-music`.
+A Central transforma fotos do celular (ou PDFs) de partituras em arquivos do **MuseScore** (`.mscz`), organiza as músicas e ajuda a revisar o resultado. Tudo roda no seu computador e fica na pasta do programa (a que tem o `abrir-conversor.sh`).
 
 ## 1. O que esperar
 
@@ -15,11 +15,11 @@ O que mostrou o teste com *My Savior and My Son* (Trombone 3 / Tuba, 2 fotos, 16
 | Você digita os números das pausas | 165 compassos e as notas iguais à versão revisada, compasso a compasso |
 | Falta acrescentar no MuseScore | dinâmicas, andamentos, *rit.*/*a tempo*, fermatas e parte dos acentos |
 
-A versão revisada de *My Savior and My Son* que está em `partituras/` foi feita por **transcrição assistida pelo Claude**, conferida compasso a compasso — nenhum programa de reconhecimento gerou aquele arquivo sozinho.
+A versão revisada de *My Savior and My Son* usada nessa comparação foi feita por **transcrição assistida pelo Claude**, conferida compasso a compasso — nenhum programa de reconhecimento gerou aquele arquivo sozinho.
 
 ## 2. Abrir o programa
 
-- Abra **Central de Partituras** no menu de aplicativos do GNOME, ou dê dois cliques em `abrir-conversor.sh` na pasta `image-to-music` (ou rode esse arquivo no terminal).
+- Abra **Central de Partituras** no menu de aplicativos do GNOME, ou dê dois cliques em `abrir-conversor.sh`, na pasta do programa (ou rode esse arquivo no terminal).
 - Ele abre uma janela própria. Pode fechar a janela à vontade: as conversões que estiverem na fila continuam, e um aviso aparece na área de trabalho quando terminam. Alguns minutos depois de fechar a janela (e com a fila vazia), o programa se encerra sozinho.
 - **Primeira instalação** (ou num computador novo): no terminal, rode `conversor/instalar.sh`. Ele instala tudo dentro da pasta `conversor/` e pergunta se você quer o atalho no menu.
 
@@ -128,7 +128,7 @@ Para músicas importantes ou difíceis, a Central prepara tudo para uma revisão
 
 1. Clique em **Preparar pacote de revisão** (≈1 minuto). O pacote tem as fotos em JPEG, as guias de altura, o rascunho listado compasso a compasso, o relatório e um `PEDIDO.md`.
 2. Clique em **Copiar pedido**.
-3. Abra o **Claude Code** na pasta `image-to-music` e cole o pedido.
+3. Abra o **Claude Code** na pasta do programa e cole o pedido.
 4. O Claude escreve a transcrição em `musicas/<música>/transcricao/`, confere as durações e gera o `.mscz`; você compara o PDF com as fotos.
 
 ## 13. Exportar tudo num .zip

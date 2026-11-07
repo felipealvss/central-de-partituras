@@ -9,7 +9,7 @@ from PIL import Image
 
 from partituras import fotos
 from partituras.biblioteca import Biblioteca, Conflito, Invalido
-from testes.util import RAIZ_PROJETO
+from testes.util import RAIZ_PROJETO, temporaria
 
 
 def jpeg(hora=None, cor='white'):
@@ -25,7 +25,7 @@ def jpeg(hora=None, cor='white'):
 
 class TestFotos(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = temporaria(self)
 
     def test_hora_pelo_exif(self):
         p = self.tmp / 'a.jpg'
@@ -63,7 +63,7 @@ class TestFotos(unittest.TestCase):
 
 class TestBiblioteca(unittest.TestCase):
     def setUp(self):
-        self.b = Biblioteca(Path(tempfile.mkdtemp()))
+        self.b = Biblioteca(temporaria(self))
         self.nomes = []
         for i, (hora, cor) in enumerate([('2026:11:07 10:00:07', 'white'), ('2026:11:07 10:00:00', 'gray'),
                                          ('2026:11:07 10:30:00', 'black')]):
@@ -148,7 +148,7 @@ class TestBiblioteca(unittest.TestCase):
 
 class TestEstadoDeMusicaRevisada(unittest.TestCase):
     def test_revisada_reconvertida_volta_a_revisada(self):
-        b = Biblioteca(Path(tempfile.mkdtemp()))
+        b = Biblioteca(temporaria(self))
         b.importar('a.jpg', jpeg('2026:11:07 10:00:00'))
         m = b.criar('Hino', ['a.jpg'])
         m = b.atualizar(m['id'], m['revisao'], {'revisada': True})
@@ -159,7 +159,7 @@ class TestEstadoDeMusicaRevisada(unittest.TestCase):
         self.assertEqual(b.ler(m['id'])['estado'], 'revisada')
 
     def test_conversao_legada_nao_vira_erro(self):
-        b = Biblioteca(Path(tempfile.mkdtemp()))
+        b = Biblioteca(temporaria(self))
         m = b.criar('Hino')
         m['conversoes'].append({'id': 'antiga', 'estado': 'legado', 'versoes': []})
         m['revisada'] = True

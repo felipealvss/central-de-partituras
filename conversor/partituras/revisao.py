@@ -15,16 +15,20 @@ from .erros import ErroConversao
 
 def listar_compassos(arvore):
     """Rascunho legível: uma linha por compasso, notas da mais grave para a mais aguda."""
-    linhas = []
+    linhas, restante = [], 0
     for m in mx.partes(arvore)[0].findall('measure'):
         itens = []
         for el in m:
             if el.tag == 'attributes':
                 k, t = el.findtext('key/fifths'), el.findtext('time/beats')
+                mr = el.findtext('measure-style/multiple-rest')
                 if k is not None:
                     itens.append(f'[armadura {k}]')
                 if t:
                     itens.append(f"[compasso {t}/{el.findtext('time/beat-type')}]")
+                if mr and mr.strip().isdigit():
+                    itens.append(f'[pausa longa de {mr} compassos]')
+                    restante = int(mr)
             if el.tag != 'note':
                 continue
             tipo = (el.findtext('type') or 'compasso') + ('.' if el.find('dot') is not None else '')
@@ -33,7 +37,10 @@ def listar_compassos(arvore):
                 continue
             lig = '~' if el.find("tie[@type='start']") is not None else ''
             itens.append(('+' if el.find('chord') is not None else ' ') + f'{mx.nome_nota(el)}:{tipo}{lig}')
-        linhas.append(f"c.{m.get('number'):>3}: " + (' '.join(itens) if itens else '(vazio)'))
+        if not m.findall('note'):
+            itens.append('pausa' if restante > 0 else '(vazio: provável nota perdida)')
+        restante -= 1
+        linhas.append(f"c.{m.get('number'):>3}: " + ' '.join(itens))
     return '\n'.join(linhas) + '\n'
 
 
@@ -51,12 +58,12 @@ Comparar o rascunho com as fotos, compasso a compasso, e escrever a transcriçã
    nota desenhado (Mi2, Dó2, Lá1…). Conte as linhas pela guia, não no olho.
 2. Confira contra `rascunho-por-compasso.txt` (o que o {motor} leu, já com ligaduras e pausas corrigidas).
    As notas pretas costumam estar certas; confira semibreves graves, pausas longas, acidentes e ligaduras.
-3. Escreva a transcrição em `{transcricao}` usando `conversor/partituras/notacao.py`
+3. Escreva a transcrição em `{transcricao}` (arquivo novo, com data: não apague transcrições anteriores) usando `conversor/partituras/notacao.py`
    (exemplo completo: `musicas/my-savior-and-my-son/transcricao/transcricao.py`).
    Inclua dinâmicas, andamentos, rit./a tempo, forquilhas, articulações, fermatas e barras duplas.
 4. Gere e confira (na pasta conversor/):
    `.venv/bin/python -m partituras.notacao ../{transcricao} -o ../{saida_xml} --mscz "{saida_mscz}" --pdf`
-   A geração recusa compassos com duração errada.
+   A geração recusa compassos com duração errada e nunca sobrescreve um .mscz existente (salva como "Nome (2)").
 5. Compare o PDF gerado com as fotos, sistema por sistema. Último compasso impresso: {ultimo}.
 
 ## Arquivos desta pasta
@@ -92,11 +99,12 @@ def montar(tarefa, progresso):
             shutil.copyfile(vdir / 'conferencia.json', pasta / 'conferencia.json')
     m = tarefa['musica']
     base = m['id']
+    carimbo = pasta.name
     rel = str(pasta.relative_to(Path(tarefa['raiz']))) if tarefa.get('raiz') else str(pasta)
     texto = PEDIDO.format(titulo=m['titulo'], instr=f" ({m['instrumento']})" if m.get('instrumento') else '',
                           rel=rel, clave='fá' if (tarefa.get('clave') or 'fa') == 'fa' else 'sol',
-                          motor=tarefa.get('motor') or 'motor', transcricao=f'musicas/{base}/transcricao/transcricao.py',
-                          saida_xml=f'musicas/{base}/transcricao/{base}.musicxml',
+                          motor=tarefa.get('motor') or 'motor', transcricao=f'musicas/{base}/transcricao/transcricao-{carimbo}.py',
+                          saida_xml=f'musicas/{base}/transcricao/transcricao-{carimbo}.musicxml',
                           saida_mscz=f"../partituras/{m['titulo']} (revisada).mscz",
                           ultimo=m.get('ultimo_compasso') or 'confira na última página')
     (pasta / 'PEDIDO.md').write_text(texto, encoding='utf-8')

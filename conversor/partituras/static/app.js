@@ -393,7 +393,7 @@ function blocoConversao(m) {
           el('div', { class: 'descricao', text: faltando ? 'Não instalado (rode conversor/instalar.sh).' : desc }));
       })),
     el('div', { class: 'grade-campos', style: 'margin-top:14px' },
-      el('div', {}, el('label', { class: 'rotulo', text: 'Pasta de saída' }),
+      el('div', { class: 'campo-largo' }, el('label', { class: 'rotulo', text: 'Pasta de saída' }),
         el('div', { class: 'linha-saida' },
           el('input', { class: 'campo', readonly: true, value: curto(pasta) || `${curto(est.saidaPadrao)} (padrão)`, title: pasta || est.saidaPadrao }),
           el('button', { class: 'botao', onclick: () => escolherPasta(m) }, 'Escolher…'),
@@ -903,9 +903,9 @@ function renderFila() {
     const p = a.progresso || {};
     const det = p.i && p.n;
     const tempo = `${Math.floor(a.segundos / 60)}:${String(a.segundos % 60).padStart(2, '0')}`;
-    const rotulo = a.tipo === 'revisao' ? 'Preparando revisão de' : a.tipo === 'acabar' ? 'Refazendo acabamento de' : 'Convertendo';
-    partes.push(status('convertendo'),
-      el('span', {}, `${rotulo} `, el('strong', { text: a.titulo }), ` · ${a.motor} · ${p.msg || ''} · `, el('span', { class: 'num', text: tempo })),
+    const rotulo = a.tipo === 'revisao' ? 'Preparando revisão' : a.tipo === 'acabar' ? 'Refazendo acabamento' : 'Convertendo';
+    partes.push(el('span', { class: 'status' }, icone('gira'), rotulo),
+      el('span', {}, el('strong', { text: a.titulo }), ` · ${a.motor} · ${p.msg || ''} · `, el('span', { class: 'num', text: tempo })),
       el('div', { class: `progresso${det ? '' : ' indeterminado'}`, role: 'progressbar', 'aria-label': 'Progresso' },
         el('div', { style: `width:${det ? Math.round((p.i - 0.5) / p.n * 100) : 30}%` })),
       el('button', { class: 'botao mini', onclick: () => api('DELETE', `/api/fila/${enc(a.id)}`).then(() => aviso('Cancelando…')).catch(falhou) }, 'Cancelar'));
@@ -984,6 +984,9 @@ function markdown(texto) {
     }
     if (codigo) { codigo.push(linha); continue; }
     let m;
+    if ((m = linha.match(/^!\[([^\]]*)\]\(conversor\/partituras\/static\/(manual\/[\w.-]+)\)\s*$/))) {
+      fechar(); out.push(`<img src="/static/${m[2]}" alt="${esc(m[1])}" loading="lazy">`); continue;
+    }
     if ((m = linha.match(/^(#{1,4})\s+(.*)/))) { fechar(); out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`); }
     else if ((m = linha.match(/^\s*[-*]\s+(.*)/))) { if (!lista || lista.tipo !== 'ul') { fechar(); lista = { tipo: 'ul', itens: [] }; } lista.itens.push(inline(m[1])); }
     else if ((m = linha.match(/^\s*\d+[.)]\s+(.*)/))) { if (!lista || lista.tipo !== 'ol') { fechar(); lista = { tipo: 'ol', itens: [] }; } lista.itens.push(inline(m[1])); }

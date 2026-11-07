@@ -8,6 +8,7 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 
+from testes.util import temporaria
 from partituras.biblioteca import Biblioteca
 from partituras.fila import Fila
 from partituras.servidor import criar_app
@@ -46,7 +47,7 @@ def esperar(cond, segundos=15):
 
 class Base(unittest.TestCase):
     def setUp(self):
-        self.b = Biblioteca(Path(tempfile.mkdtemp()))
+        self.b = Biblioteca(temporaria(self))
         self.fila = Fila(self.b, comando=falso, verificar_motores=False)
         self.app = criar_app(self.b, self.fila, TOKEN)
         self.c = self.app.test_client()

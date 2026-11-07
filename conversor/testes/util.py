@@ -46,3 +46,12 @@ def partitura(*compassos, divisoes=2, fifths=0):
     xml = ('<score-partwise version="4.0"><part-list><score-part id="P1"><part-name>X</part-name></score-part></part-list>'
            f'<part id="P1">{"".join(corpo)}</part></score-partwise>')
     return ET.ElementTree(ET.fromstring(xml))
+
+
+def temporaria(caso):
+    """Pasta temporária apagada ao fim do teste."""
+    import shutil
+    import tempfile
+    p = Path(tempfile.mkdtemp(prefix='central-teste-'))
+    caso.addCleanup(shutil.rmtree, p, True)
+    return p

@@ -11,7 +11,7 @@ from partituras import conferencia
 from partituras import musicxml as mx
 from partituras import notacao, processos, publicar
 from partituras.erros import ErroConversao
-from testes.util import DADOS, RAIZ_PROJETO, homr_unido
+from testes.util import DADOS, RAIZ_PROJETO, homr_unido, temporaria
 
 
 def _referencia(nome):
@@ -55,7 +55,7 @@ class TestConferencia(unittest.TestCase):
 
 class TestPublicar(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = temporaria(self)
         self.origem = self.tmp / 'origem.mscz'
         self.origem.write_bytes(b'novo')
 
@@ -94,7 +94,7 @@ class TestProcessos(unittest.TestCase):
         self.assertLess(time.monotonic() - inicio, 10)
 
     def test_cancelar_mata_processo_neto(self):
-        tmp = Path(tempfile.mkdtemp())
+        tmp = temporaria(self)
         pidfile = tmp / 'neto.pid'
         p = subprocess.Popen(['sh', '-c', f'sleep 60 & echo $! > {pidfile}; wait'], start_new_session=True)
         for _ in range(50):

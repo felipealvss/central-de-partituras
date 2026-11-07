@@ -20,13 +20,23 @@ def ultima_versao(m):
     return None, None
 
 
+def conversoes_atuais(m):
+    """As conversões do relatório atual: as do último lote (motor 'os dois') ou a última com resultado."""
+    conv, _ = ultima_versao(m)
+    if conv is None:
+        return []
+    if conv.get('lote'):
+        return [c for c in m['conversoes'] if c.get('lote') == conv['lote'] and c.get('versoes')]
+    return [conv]
+
+
 def arquivos_finais(m):
-    """O arquivo revisado, se a música tiver; senão os publicados da última versão."""
+    """O arquivo revisado, se a música tiver; senão os publicados das conversões atuais (os dois motores, se for o caso)."""
     final = (m.get('final') or {}).get('publicados') or {}
-    if not final:
-        _, versao = ultima_versao(m)
-        final = (versao or {}).get('publicados') or {}
-    return {ext: Path(p) for ext, p in final.items() if p and Path(p).exists()}
+    if final:
+        return [Path(p) for p in final.values() if p and Path(p).exists()]
+    return [Path(p) for c in conversoes_atuais(m) for p in c['versoes'][-1].get('publicados', {}).values()
+            if p and Path(p).exists()]
 
 
 def _leia_me(m, conteudo):
@@ -52,25 +62,36 @@ def exportar(b, ids, incluir=None):
             for m in musicas:
                 raiz = '' if len(musicas) == 1 else nome_seguro(m['titulo']) + '/'
                 conteudo = []
-                for ext, p in arquivos_finais(m).items():
+                for p in arquivos_finais(m):
                     z.write(p, raiz + p.name)
                     conteudo.append(p.name)
-                conv, versao = ultima_versao(m)
-                if versao:
+                convs = conversoes_atuais(m)
+                guias_postas = False
+                for conv in convs:
+                    versao = conv['versoes'][-1]
+                    sufixo = f"-{conv['motor']}" if len(convs) > 1 else ''
                     cdir = b.pasta_conversao(m['id'], conv['id'])
                     vdir = cdir / 'versoes' / f"{versao['n']:02d}"
                     if opc['relatorio'] and (vdir / 'conferencia.txt').exists():
-                        z.write(vdir / 'conferencia.txt', raiz + 'conferencia.txt')
-                        conteudo.append('conferencia.txt (relatório da última conversão)')
+                        z.write(vdir / 'conferencia.txt', raiz + f'conferencia{sufixo}.txt')
+                        conteudo.append(f'conferencia{sufixo}.txt (relatório da conversão)')
                     if opc['musicxml'] and (vdir / 'partitura.musicxml').exists():
-                        z.write(vdir / 'partitura.musicxml', raiz + 'partitura.musicxml')
-                        conteudo.append('partitura.musicxml (abre em qualquer editor de partitura)')
-                    if opc['guias']:
+                        z.write(vdir / 'partitura.musicxml', raiz + f'partitura{sufixo}.musicxml')
+                        conteudo.append(f'partitura{sufixo}.musicxml (abre em qualquer editor de partitura)')
+                    if opc['guias'] and not guias_postas:
                         for g in sorted((cdir / 'guias').glob('*.jpg')):
                             z.write(g, raiz + 'guias/' + g.name)
+                            guias_postas = True
                     if opc['logs']:
                         for log in sorted((cdir / 'logs').glob('*.log')):
-                            z.write(log, raiz + 'logs/' + log.name)
+                            z.write(log, raiz + f'logs{sufixo}/' + log.name)
+                if opc['guias'] and not guias_postas:  # guias do pacote de revisão mais recente
+                    pacote = next((Path(r['pasta']) for r in reversed(m.get('revisoes', [])) if r.get('ok') and r.get('pasta')), None)
+                    for g in sorted((pacote / 'guias').glob('*.jpg')) if pacote and pacote.is_dir() else []:
+                        z.write(g, raiz + 'guias/' + g.name)
+                        guias_postas = True
+                if guias_postas:
+                    conteudo.append('guias/ (imagens com o nome das notas nas linhas suplementares)')
                 if opc['fotos']:
                     for i, (p, _giro) in enumerate(b.paginas(m), 1):
                         z.write(p, raiz + f'fotos/pagina-{i:02d}{p.suffix.lower()}')

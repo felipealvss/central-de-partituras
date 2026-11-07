@@ -195,11 +195,16 @@ def main():
     xml = p.salvar(args.musicxml)
     print(f'MusicXML: {xml} ({max(p.M)} compassos, todos com a duração certa)')
     if args.mscz:
+        import tempfile
         from . import musescore
-        mscz = musescore.converter(xml, Path(args.mscz))
-        print(f'MuseScore: {mscz}')
-        if args.pdf:
-            print(f'PDF: {musescore.converter(mscz, Path(args.mscz).with_suffix(".pdf"))}')
+        from .publicar import publicar
+        destino = Path(args.mscz)
+        with tempfile.TemporaryDirectory() as tmp:
+            arquivos = {'.mscz': musescore.converter(xml, Path(tmp) / 'p.mscz')}
+            if args.pdf:
+                arquivos['.pdf'] = musescore.converter(arquivos['.mscz'], Path(tmp) / 'p.pdf')
+            for ext, final in publicar(arquivos, destino.parent, destino.stem).items():
+                print(f'{ext[1:].upper()}: {final}')  # nunca sobrescreve: se existir, salva como "Nome (2)"
 
 
 if __name__ == '__main__':

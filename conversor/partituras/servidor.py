@@ -19,6 +19,7 @@ from pathlib import Path
 from flask import Flask, abort, jsonify, redirect, request, send_file, send_from_directory
 
 from . import caminhos, exportar, motores, sistema
+from . import musicxml as mx
 from .biblioteca import Biblioteca, Conflito, Invalido, NaoEncontrado, _gravar_json
 from .erros import ErroConversao
 from .fila import Fila
@@ -204,7 +205,8 @@ def criar_app(b, fila, token):
     @app.post('/api/musicas/<mid>/conversoes/<cid>/acabar')
     def acabar(mid, cid):
         d = corpo()
-        correcoes = {str(int(k)): int(v) for k, v in (d.get('correcoes') or {}).items() if str(v).strip()}
+        correcoes = {str(k): [list(g) for g in v] if isinstance(v, list) else v
+                     for k, v in mx.validar_correcoes(d.get('correcoes')).items()}
         return {'trabalhos': fila.enfileirar(mid, 'acabar', cid=cid, correcoes=correcoes,
                                              substituir=bool(d.get('substituir')))}
 

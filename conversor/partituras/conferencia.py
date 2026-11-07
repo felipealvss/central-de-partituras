@@ -18,7 +18,9 @@ def _duracao(m):
     return maximo
 
 
-def analisar(arvore, motor=None, ultimo_compasso=None, ligaduras=(), textos=()):
+def analisar(arvore, motor=None, ultimo_compasso=None, ligaduras=(), textos=(), trechos=None):
+    """trechos: os trechos de pausa como o motor leu, já situados depois das correções (mx.situar_trechos);
+    sem eles, usa os da partitura como está."""
     parte = mx.partes(arvore)[0]
     divisoes, beats, beat_type = 1, 4, 4
     compassos, pausas_longas = [], []
@@ -56,7 +58,7 @@ def analisar(arvore, motor=None, ultimo_compasso=None, ligaduras=(), textos=()):
         'diferenca': diferenca,
         'com_notas': sum(c['tipo'] == 'notas' for c in compassos),
         'compassos': compassos,
-        'trechos': mx.trechos_de_pausa(arvore),
+        'trechos': trechos if trechos is not None else mx.trechos_de_pausa(arvore),
         'pausas_longas': pausas_longas,
         'duracao_errada': [c for c in compassos if c.get('problema') == 'duracao'],
         'suspeitos': [c['n'] for c in compassos if c.get('problema') == 'suspeito'],
@@ -66,6 +68,20 @@ def analisar(arvore, motor=None, ultimo_compasso=None, ligaduras=(), textos=()):
     }
     rel['alertas'] = bool(rel['duracao_errada'] or rel['suspeitos'] or diferenca)
     return rel
+
+
+def _linha_trecho(t):
+    linha = f"  {t['indice']}) c.{t['inicio']}–{t['fim']}: {t['lidos']} compasso(s)"
+    if t.get('grupos'):
+        linha += ' = ' + ' + '.join(f'{n} em {f}' if f else str(n) for n, f in t['grupos'])
+    elif t.get('compasso'):
+        linha += f" em {t['compasso']}"
+    lido = t.get('grupos_motor') or []
+    if t.get('motor') is not None and (t['motor'] != t['lidos'] or t.get('grupos')):
+        linha += f" (o motor leu {' + '.join(str(g['n']) for g in lido) if len(lido) > 1 else t['motor']})"
+    elif len(lido) > 1:
+        linha += f" (pausas de {' + '.join(str(g['n']) for g in lido)})"
+    return linha
 
 
 def formatar(rel):
@@ -81,7 +97,7 @@ def formatar(rel):
         total += ' (compare com o último número de compasso impresso na partitura)'
     linhas.append(total)
     linhas.append('Trechos de pausa (confira cada número com a partitura; os de dois dígitos costumam sair errados):')
-    linhas.extend(f"  {t['indice']}) c.{t['inicio']}–{t['fim']}: {t['lidos']} compasso(s)" for t in rel['trechos'])
+    linhas.extend(_linha_trecho(t) for t in rel['trechos'])
     if not rel['trechos']:
         linhas.append('  nenhum')
     linhas.append('Compassos com duração errada (nota ou figura mal reconhecida):')

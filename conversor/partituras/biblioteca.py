@@ -416,7 +416,7 @@ class Biblioteca:
             m = self.ler(mid)
             m.setdefault('revisoes', []).append({'quando': agora(), 'ok': bool(resultado.get('ok')),
                                                  'pasta': resultado.get('pasta'), 'pedido': resultado.get('pedido'),
-                                                 'erro': resultado.get('erro')})
+                                                 'erro': resultado.get('erro'), 'aviso': resultado.get('aviso')})
             m['revisao'] += 1
             return self._salvar(m)
 

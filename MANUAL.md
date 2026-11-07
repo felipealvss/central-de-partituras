@@ -109,6 +109,10 @@ Preencha **Instrumento ou parte**, **Compositor / arranjo** e, principalmente, o
 
 Um trecho pode juntar duas pausas longas seguidas (por exemplo, 20 + 17 compassos aparecem como um trecho de 37): o que importa é o total do trecho.
 
+Cada trecho mostra a fórmula de compasso em que foi lido e, quando junta várias pausas, como o motor as leu (por exemplo, *4/4 · motor leu 4 + 2 + 1*). Se a fórmula estiver errada ou mudar no meio do trecho, clique em **Dividir ou mudar compasso** e informe cada pausa com a sua fórmula, na ordem da partitura. Exemplo: o fim impresso tem uma pausa de 5 compassos em 3/4, depois 3 em 4/4 e um último compasso com fermata; o trecho fica **5 em 3/4**, **3 em 4/4** e **1 em como lido**. Use **+ grupo** para acrescentar uma linha e **✕** para tirar.
+
+Um compasso de pausa avulso logo depois de uma pausa longa aparece no MuseScore com um "1" em cima; ao acrescentar a fermata (o homr não lê fermatas), ele fica igual ao impresso.
+
 ## 11. Revisar no MuseScore
 
 Clique em **Abrir no MuseScore** e confira com a partitura impressa ao lado:
@@ -126,7 +130,7 @@ Depois marque o **checklist de revisão** na Central e clique em **✓ Marcar co
 
 Para músicas importantes ou difíceis, a Central prepara tudo para uma revisão assistida — o mesmo processo que gerou a versão revisada desse teste:
 
-1. Clique em **Preparar pacote de revisão** (≈1 minuto). O pacote tem as fotos em JPEG, as guias de altura, o rascunho listado compasso a compasso, o relatório e um `PEDIDO.md`.
+1. Clique em **Preparar pacote de revisão** (≈1 minuto). O pacote tem as fotos em JPEG, as guias de altura, o rascunho listado compasso a compasso, o relatório e um `PEDIDO.md`. Se o Audiveris não conseguir localizar as pautas, o pacote sai mesmo assim, sem as guias e com um aviso; o pedido explica ao Claude como ler as alturas direto nas fotos.
 2. Clique em **Copiar pedido**.
 3. Abra o **Claude Code** na pasta do programa e cole o pedido.
 4. O Claude escreve a transcrição em `musicas/<música>/transcricao/`, confere as durações e gera o `.mscz`; você compara o PDF com as fotos.
@@ -175,4 +179,5 @@ Na pasta `conversor/`:
 - **"Motor não instalado"**: rode `conversor/instalar.sh`.
 - **Foto de cabeça para baixo ou deitada**: use **↻** na caixa de entrada ou nas páginas da música, antes de converter.
 - **Música "Interrompida"**: o programa foi fechado durante a conversão; converta de novo.
+- **Fotos de câmeras de muitos megapixels**: o Audiveris não aceita páginas acima de 20 megapixels; a Central reduz as fotos sozinha antes de enviar.
 - **Detalhes técnicos de um erro**: `musicas/<música>/conversoes/<data>/logs/` e `.estado/servidor.log`.

@@ -100,6 +100,7 @@ class TestFluxo(Base):
         self.assertEqual(self.get('/api/entrada').get_json()['fotos'], [])
         r = self.get(f"/api/imagem/musica/{m['id']}/pagina1.jpg?lado=200")
         self.assertEqual((r.status_code, r.mimetype), (200, 'image/jpeg'))
+        r.close()
 
     def test_conflito_retorna_409(self):
         m = self.musica_com_foto()
@@ -136,6 +137,19 @@ class TestFluxo(Base):
         self.b.definir_estado(m['id'], 'convertendo', cid)
         Fila(self.b, comando=falso, verificar_motores=False).recuperar()
         self.assertEqual(self.b.ler(m['id'])['estado'], 'interrompida')
+
+    def test_acabar_aceita_grupos_com_formula(self):
+        m = self.musica_com_foto()
+        self.envia('post', f"/api/musicas/{m['id']}/converter")
+        self.assertTrue(esperar(lambda: self.b.ler(m['id'])['estado'] == 'rascunho_alertas'))
+        cid = self.b.ler(m['id'])['conversoes'][-1]['id']
+        url = f"/api/musicas/{m['id']}/conversoes/{cid}/acabar"
+        for ruim in ({'1': [[5, '3/4'], [0, '4/4']]}, {'1': [[5, '3x4']]}, {'1': 'muitos'}):
+            self.assertEqual(self.envia('post', url, json={'correcoes': ruim}).status_code, 400, ruim)
+        correcoes = {'1': [[5, '3/4'], [3, '4/4'], [1, '']], '2': 8}
+        self.assertEqual(self.envia('post', url, json={'correcoes': correcoes}).status_code, 200)
+        self.assertTrue(esperar(lambda: len(self.b.ler(m['id'])['conversoes'][-1]['versoes']) == 2))
+        self.assertEqual(self.b.ler(m['id'])['conversoes'][-1]['versoes'][-1]['correcoes'], correcoes)
 
     def test_exportar_zip(self):
         m = self.musica_com_foto()

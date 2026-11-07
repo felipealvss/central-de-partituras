@@ -634,14 +634,35 @@ function tabelaRelatorio(rel) {
     el('tbody', {}, linhas.map(l => el('tr', {}, el('td', { class: 'num', text: l[0] }), el('td', { text: l[1] }), el('td', { text: l[2] })))));
 }
 
-/* ---- correção dos trechos de pausa: refaz só o acabamento (segundos) */
+/* ---- correção dos trechos de pausa: refaz só o acabamento (segundos). Um trecho pode ser dividido em grupos,
+        cada um com a sua fórmula de compasso (ex.: 5 em 3/4 + 3 em 4/4 + 1), quando o motor errou a fórmula. */
+const FORMULAS = ['2/4', '3/4', '4/4', '2/2', '3/8', '6/8', '9/8', '12/8', '5/4', '6/4', '3/2'];
+const totalDoValor = v => Array.isArray(v) ? v.reduce((s, g) => s + (Number(g.n) || 0), 0) : (Number(v) || 0);
+function leituraDoMotor(t, lidosMotor) {
+  const grupos = t.grupos_motor || [];
+  if (grupos.length > 1) return `motor leu ${grupos.map(g => g.n).join(' + ')}`;
+  const lido = t.motor !== undefined ? t.motor : lidosMotor[t.indice];
+  return lido !== undefined && (Number(lido) !== t.lidos || t.grupos) ? `motor leu ${lido}` : '';
+}
+function seletorFormula(g, rotulo, aoMudar) {
+  const opcoes = ['', ...FORMULAS];
+  if (g.f && !opcoes.includes(g.f)) opcoes.push(g.f);
+  return el('select', { class: 'campo', 'aria-label': rotulo, onchange: e => { g.f = e.target.value; aoMudar(); } },
+    opcoes.map(f => el('option', { value: f, selected: f === (g.f || '') }, f || 'como lido')));
+}
 function correcaoTrechos(m, c, rel, chave) {
   if (!rel.trechos.length) return null;
-  const valores = est.correcoes[chave] || (est.correcoes[chave] = Object.fromEntries(rel.trechos.map(t => [t.indice, t.lidos])));
-  const lidosMotor = Object.fromEntries((rel.correcoes || []).map(x => [x.indice, x.lidos]));
+  const lidosMotor = Object.fromEntries((rel.correcoes || []).map(x => [x.indice, x.lidos]));  // versões antigas
+  const valores = est.correcoes[chave] || (est.correcoes[chave] = Object.fromEntries(rel.trechos.map(t =>
+    [t.indice, t.grupos ? t.grupos.map(([n, f]) => ({ n, f })) : t.lidos])));
+  const mudou = t => {
+    const v = valores[t.indice];
+    if (!Array.isArray(v)) return Number(v) !== t.lidos || !!t.grupos;
+    return JSON.stringify(v.map(g => [Number(g.n), g.f || ''])) !== JSON.stringify(t.grupos || []);
+  };
   const saldo = el('span', { class: 'saldo' });
   const atualizarSaldo = () => {
-    const novoTotal = rel.total + rel.trechos.reduce((s, t) => s + (Number(valores[t.indice]) || 0) - t.lidos, 0);
+    const novoTotal = rel.total + rel.trechos.reduce((s, t) => s + totalDoValor(valores[t.indice]) - t.lidos, 0);
     if (rel.esperado) {
       const d = novoTotal - rel.esperado;
       saldo.className = `saldo ${d === 0 ? 'delta-bom' : 'delta-ruim'}`;
@@ -651,24 +672,64 @@ function correcaoTrechos(m, c, rel, chave) {
       saldo.textContent = `Total ${novoTotal} compassos (preencha o último compasso impresso para conferir)`;
     }
   };
-  atualizarSaldo();
+  const lista = el('div', { class: 'trechos' });
+  const desenhar = () => { lista.replaceChildren(...rel.trechos.map(cartao)); atualizarSaldo(); };
+  function cartao(t) {
+    const v = valores[t.indice];
+    const caixa = el('div', { class: 'trecho' + (Array.isArray(v) ? ' em-grupos' : '') });
+    const soma = el('span', { class: 'apagado pequeno' });
+    const marcar = () => {
+      caixa.classList.toggle('mudou', mudou(t));
+      if (Array.isArray(v)) soma.textContent = `total ${totalDoValor(v)}`;
+      atualizarSaldo();
+    };
+    const meta = [t.compasso, leituraDoMotor(t, lidosMotor)].filter(Boolean).join(' · ');
+    const titulo = el('div', {}, el('strong', { text: `Trecho ${t.indice}` }), ` · c. ${t.inicio}–${t.fim}`,
+      meta ? el('div', { class: 'apagado pequeno', text: meta }) : null);
+    if (!Array.isArray(v)) {
+      caixa.append(titulo,
+        el('input', { class: 'campo num', type: 'number', min: 1, max: 999, value: v, 'aria-label': `Compassos do trecho ${t.indice}`,
+          oninput: e => { valores[t.indice] = e.target.value; marcar(); } }),
+        el('button', { class: 'botao mini fantasma dividir', type: 'button',
+          title: 'Informar cada pausa do trecho e a fórmula de compasso de cada uma (3/4, 4/4…)',
+          onclick: () => {
+            valores[t.indice] = t.grupos ? t.grupos.map(([n, f]) => ({ n, f }))
+              : (t.grupos_motor || []).length ? t.grupos_motor.map(g => ({ n: g.n, f: g.compasso || '' }))
+                : [{ n: Number(v) || t.lidos, f: t.compasso || '' }];
+            desenhar();
+          } }, 'Dividir ou mudar compasso'));
+    } else {
+      const linhas = v.map((g, i) => el('div', { class: 'grupo-linha' },
+        el('input', { class: 'campo num', type: 'number', min: 1, max: 999, value: g.n,
+          'aria-label': `Compassos do grupo ${i + 1} do trecho ${t.indice}`, oninput: e => { g.n = e.target.value; marcar(); } }),
+        el('span', { text: 'compasso(s) em' }),
+        seletorFormula(g, `Fórmula de compasso do grupo ${i + 1} do trecho ${t.indice}`, marcar),
+        v.length > 1 ? el('button', { class: 'botao mini fantasma', type: 'button', title: 'Tirar este grupo',
+          'aria-label': `Tirar o grupo ${i + 1} do trecho ${t.indice}`, onclick: () => { v.splice(i, 1); desenhar(); } }, '✕') : null));
+      caixa.append(titulo, el('div', { class: 'grupos-linhas' }, linhas,
+        el('div', { class: 'grupo-acoes' },
+          el('button', { class: 'botao mini fantasma', type: 'button', onclick: () => { v.push({ n: 1, f: '' }); desenhar(); } }, '+ grupo'),
+          el('button', { class: 'botao mini fantasma', type: 'button',
+            onclick: () => { valores[t.indice] = totalDoValor(v) || t.lidos; desenhar(); } }, 'Voltar a um número só'),
+          soma)));
+    }
+    marcar();
+    return caixa;
+  }
+  desenhar();
   const ocupado = ocupada(m);
+  const correcoes = () => Object.fromEntries(rel.trechos.map(t => {
+    const v = valores[t.indice];
+    return [t.indice, Array.isArray(v) ? v.map(g => [Number(g.n), g.f || '']) : v];
+  }));
   return el('div', {},
     el('h4', { style: 'margin:16px 0 4px', text: 'Corrigir trechos de pausa' }),
-    el('p', { class: 'apagado pequeno', text: 'Confira na partitura impressa quantos compassos cada trecho tem (os números de dois dígitos costumam sair errados) e refaça o acabamento: leva segundos, sem reconhecer de novo.' }),
-    el('div', { class: 'trechos' }, rel.trechos.map(t => {
-      const linha = el('label', { class: 'trecho' },
-        el('span', {}, el('strong', { text: `Trecho ${t.indice}` }), ` · c. ${t.inicio}–${t.fim}`,
-          lidosMotor[t.indice] !== undefined ? el('span', { class: 'apagado pequeno', text: ` (motor leu ${lidosMotor[t.indice]})` }) : null),
-        el('input', { class: 'campo num', type: 'number', min: 1, max: 999, value: valores[t.indice], 'aria-label': `Compassos do trecho ${t.indice}`,
-          oninput: e => { valores[t.indice] = e.target.value; linha.classList.toggle('mudou', Number(e.target.value) !== t.lidos); atualizarSaldo(); } }));
-      if (Number(valores[t.indice]) !== t.lidos) linha.classList.add('mudou');
-      return linha;
-    })),
+    el('p', { class: 'apagado pequeno', text: 'Confira na partitura impressa quantos compassos cada trecho tem (os números de dois dígitos costumam sair errados). Se a fórmula de compasso estiver errada ou mudar no meio do trecho, use “Dividir ou mudar compasso” e informe cada pausa com a sua fórmula. Depois refaça o acabamento: leva segundos, sem reconhecer de novo.' }),
+    lista,
     el('div', { class: 'barra-acoes' }, saldo,
       el('button', { class: 'botao primario', disabled: ocupado, onclick: async () => {
         try {
-          await api('POST', `/api/musicas/${enc(m.id)}/conversoes/${enc(c.id)}/acabar`, { correcoes: valores });
+          await api('POST', `/api/musicas/${enc(m.id)}/conversoes/${enc(c.id)}/acabar`, { correcoes: correcoes() });
           delete est.correcoes[chave];
           aviso('Refazendo o acabamento com as pausas corrigidas…', 'ok');
           carregarMusicas();
@@ -709,6 +770,8 @@ function blocoRevisaoClaude(m) {
   const corpo = [el('p', { class: 'apagado pequeno', text: 'Monta um pacote com as fotos, guias de altura, o rascunho e um pedido pronto. Você cola o pedido no Claude Code, que revisa compasso a compasso — o mesmo processo da versão revisada citada no manual.' })];
   if (ultima && ultima.ok) {
     corpo.push(el('p', {}, el('strong', { text: 'Pacote pronto ' }), el('span', { class: 'apagado pequeno', text: hora(ultima.quando) })),
+      ultima.aviso ? el('div', { class: 'aviso-cartao' }, el('span', { 'aria-hidden': 'true', text: '▲ ' }),
+        `${ultima.aviso} O pedido explica como ler as alturas direto nas fotos.`) : null,
       el('div', { class: 'barra-acoes' },
         el('button', { class: 'botao primario', onclick: () => navigator.clipboard.writeText(ultima.pedido)
           .then(() => aviso('Pedido copiado. Cole no Claude Code aberto na pasta do programa.', 'ok')).catch(falhou) }, 'Copiar pedido'),

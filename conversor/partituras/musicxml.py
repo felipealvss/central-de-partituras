@@ -1,6 +1,7 @@
 """Operações sobre MusicXML: ler e gravar, juntar páginas, pausas longas, ligaduras de valor,
 trechos de pausa (e sua correção) e limpeza do cabeçalho lido pelo OCR."""
 import copy
+import re
 import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -225,22 +226,113 @@ def _ordem(nota):
 
 # ---------------------------------------------------------------- trechos de pausa
 
-def trechos_de_pausa(arvore):
-    """Sequências de compassos só com pausa (na 1ª parte), separadas onde muda a armadura ou a fórmula
-    de compasso. Cada trecho: {'indice', 'inicio', 'fim', 'lidos'} (números de compasso a partir de 1)."""
+FORMULA = re.compile(r'^([1-9][0-9]?)/(1|2|4|8|16|32)$')
+# Ordem dos filhos de <attributes> no MusicXML: a fórmula de compasso vem antes destes.
+_DEPOIS_DA_FORMULA = ('staves', 'part-symbol', 'instruments', 'clef', 'staff-details', 'transpose', 'for-part',
+                      'directive', 'measure-style')
+
+
+def _formula(m):
+    """Fórmula de compasso escrita no compasso m, como (tempos, unidade), ou None (vale a última, como no relatório)."""
+    formula = None
+    for at in m.findall('attributes'):
+        b, t = (at.findtext('time/beats') or '').strip(), (at.findtext('time/beat-type') or '').strip()
+        if b.isdigit() and t.isdigit():
+            formula = int(b), int(t)
+    return formula
+
+
+def _vigentes(parte):
+    """(fórmula, divisions) em vigor em cada compasso da parte."""
+    formula, divisoes, saida = (4, 4), 1, []
+    for m in parte.findall('measure'):
+        for at in m.findall('attributes'):
+            d = (at.findtext('divisions') or '').strip()
+            if d.isdigit():
+                divisoes = int(d)
+        formula = _formula(m) or formula
+        saida.append((formula, divisoes))
+    return saida
+
+
+def _texto_formula(formula):
+    return f'{formula[0]}/{formula[1]}'
+
+
+def _pausa_longa(m):
+    n = (m.findtext('attributes/measure-style/multiple-rest') or '').strip()
+    return int(n) if n.isdigit() else None
+
+
+def trechos_de_pausa(arvore, com_elementos=False):
+    """Sequências de compassos só com pausa (na 1ª parte), separadas onde muda a armadura ou a fórmula de
+    compasso. Cada trecho: {'indice', 'inicio', 'fim', 'lidos', 'compasso', 'grupos'}: números de compasso a partir
+    de 1; 'compasso' é a fórmula em vigor no início ('3/4'); 'grupos' são as pausas como estão escritas, uma por
+    pausa longa ou compasso de pausa avulso (ex.: [{'n': 4, 'compasso': '4/4'}, {'n': 2, ...}, {'n': 1, ...}]).
+    Com `com_elementos`, cada trecho leva também os seus compassos em '_medidas'."""
     parte = partes(arvore)[0]
-    trechos, atual = [], None
+    vigentes = _vigentes(parte)
+    trechos, atual, cobre = [], None, 0
     for i, m in enumerate(parte.findall('measure'), 1):
-        if so_pausa(m):
-            muda = m.find('attributes/key') is not None or m.find('attributes/time') is not None
-            if atual is None or muda:
-                atual = {'indice': len(trechos) + 1, 'inicio': i, 'fim': i, 'lidos': 0}
-                trechos.append(atual)
-            atual['lidos'] += 1
-            atual['fim'] = i
-        else:
-            atual = None
+        if not so_pausa(m):
+            atual, cobre = None, 0
+            continue
+        formula = _texto_formula(vigentes[i - 1][0])
+        muda = m.find('attributes/key') is not None or m.find('attributes/time') is not None
+        if atual is None or muda:
+            atual = {'indice': len(trechos) + 1, 'inicio': i, 'fim': i, 'lidos': 0, 'compasso': formula, 'grupos': []}
+            if com_elementos:
+                atual['_medidas'] = []
+            trechos.append(atual)
+            cobre = 0
+        longa = _pausa_longa(m)
+        if longa or cobre <= 0:  # começa um grupo: uma pausa longa, ou um compasso de pausa avulso
+            atual['grupos'].append({'n': 0, 'compasso': formula})
+            cobre = longa or 1
+        atual['grupos'][-1]['n'] += 1
+        cobre -= 1
+        atual['lidos'] += 1
+        atual['fim'] = i
+        if com_elementos:
+            atual['_medidas'].append(m)
     return trechos
+
+
+def _compassos(v, indice):
+    try:
+        n = int(str(v).strip())
+    except ValueError:
+        raise ValueError(f'Trecho {indice}: número de compassos inválido ({v}).') from None
+    if not 1 <= n <= 999:
+        raise ValueError(f'Trecho {indice}: número de compassos inválido ({n}).')
+    return n
+
+
+def validar_correcoes(correcoes):
+    """Confere as correções dos trechos de pausa e devolve {indice: compassos} ou, para um trecho dividido em
+    grupos, {indice: [(compassos, 'b/t' ou ''), ...]} ('' = fórmula como foi lida). ValueError explica o erro."""
+    saida = {}
+    for k, v in (correcoes or {}).items():
+        try:
+            indice = int(k)
+        except (TypeError, ValueError):
+            raise ValueError(f'Trecho inválido: {k}.') from None
+        if isinstance(v, (list, tuple)):
+            grupos = []
+            for g in v:
+                if not isinstance(g, (list, tuple)) or not 1 <= len(g) <= 2:
+                    raise ValueError(f'Trecho {indice}: grupo inválido ({g}).')
+                formula = str(g[1] or '').strip() if len(g) == 2 else ''
+                if formula and not FORMULA.match(formula):
+                    raise ValueError(f'Trecho {indice}: fórmula de compasso inválida ({formula}). Use, por exemplo, 3/4.')
+                grupos.append((_compassos(g[0], indice), formula))
+            if sum(n for n, _ in grupos) > 999:
+                raise ValueError(f'Trecho {indice}: compassos demais.')
+            if grupos:
+                saida[indice] = grupos
+        elif v is not None and str(v).strip():
+            saida[indice] = _compassos(v, indice)
+    return saida
 
 
 def _definir_multirest(m, n):
@@ -263,55 +355,157 @@ def _definir_multirest(m, n):
         ET.SubElement(estilo, 'multiple-rest').text = str(n)
 
 
+def _redimensionar(parte, grupo, novo):
+    """Deixa o trecho (lista dos seus compassos) com `novo` compassos, mantendo o primeiro (armadura, andamento)
+    e o último (fermata, barra dupla/final). Devolve o primeiro compasso."""
+    primeiro, ultimo = grupo[0], grupo[-1]
+    if novo == 1:
+        barras = [b for b in ultimo.findall('barline') if b.get('location', 'right') == 'right']
+        for m in grupo[1:]:
+            parte.remove(m)
+        if ultimo is not primeiro:
+            for b in primeiro.findall('barline'):
+                if b.get('location', 'right') == 'right':
+                    primeiro.remove(b)
+            for b in barras:
+                primeiro.append(copy.deepcopy(b))
+    else:
+        for m in grupo[1:-1]:
+            parte.remove(m)
+        pos = list(parte).index(primeiro) + 1
+        if ultimo is primeiro:  # trecho de 1 compasso que vira N: cria os N-1 depois dele
+            barras = [b for b in primeiro.findall('barline') if b.get('location', 'right') == 'right']
+            for b in barras:
+                primeiro.remove(b)
+            novos = [ET.Element('measure') for _ in range(novo - 1)]
+            for k, nm in enumerate(novos):
+                parte.insert(pos + k, nm)
+            for b in barras:
+                novos[-1].append(b)
+        else:
+            for k in range(novo - 2):
+                parte.insert(pos + k, ET.Element('measure'))
+    return primeiro
+
+
+def _definir_formula(m, formula):
+    """Escreve (ou troca) a fórmula de compasso no compasso m; None tira a fórmula escrita."""
+    for at in m.findall('attributes'):
+        for t in at.findall('time'):
+            at.remove(t)
+    if formula is None:
+        return
+    at = m.find('attributes')
+    if at is None:
+        at = ET.Element('attributes')
+        m.insert(next((i for i, el in enumerate(m) if el.tag != 'print'), len(m)), at)
+    t = ET.Element('time')
+    ET.SubElement(t, 'beats').text = str(formula[0])
+    ET.SubElement(t, 'beat-type').text = str(formula[1])
+    at.insert(next((i for i, el in enumerate(at) if el.tag in _DEPOIS_DA_FORMULA), len(at)), t)
+
+
+def _acertar_pausa(m, formula, divisoes, sozinho):
+    """Num compasso só de pausa, deixa uma pausa de compasso inteiro com a duração da fórmula em vigor (uma
+    semibreve de 4 tempos num 3/4 deixaria o compasso grande demais). Compassos vazios dentro de uma pausa longa
+    ficam vazios (o MuseScore completa); um compasso avulso ganha a pausa, para não parecer nota perdida."""
+    duracao = divisoes * formula[0] * 4 / formula[1]
+    notas = m.findall('note')
+    if duracao != int(duracao) or (not notas and not sozinho):
+        return
+    nova = ET.Element('note')
+    ET.SubElement(nova, 'rest').set('measure', 'yes')
+    ET.SubElement(nova, 'duration').text = str(int(duracao))
+    ET.SubElement(nova, 'voice').text = '1'
+    for nome in ('staff', 'notations'):  # pauta e fermata da pausa original
+        el = next((n.find(nome) for n in notas if n.find(nome) is not None), None)
+        if el is not None:
+            nova.append(copy.deepcopy(el))
+    pos = next((i for i, el in enumerate(m) if el.tag == 'note'), None)
+    if pos is None:
+        pos = next((i for i, el in enumerate(m) if el.tag == 'barline' and el.get('location', 'right') == 'right'), len(m))
+    for el in list(m):
+        if el.tag in ('note', 'backup', 'forward'):
+            m.remove(el)
+    m.insert(min(pos, len(m)), nova)
+
+
+def _aplicar_grupos(parte, primeiro, grupos, antes, lido_no_primeiro, seguinte, formula_seguinte):
+    """Marca cada grupo do trecho (número da pausa longa e fórmula de compasso) e acerta as pausas.
+    antes: fórmula em vigor antes do trecho (None se ele abre a música); lido_no_primeiro: (fórmula, divisions)
+    lidas no 1º compasso do trecho; seguinte: o compasso depois do trecho e a fórmula que ele tinha."""
+    ms = parte.findall('measure')
+    k = ms.index(primeiro)
+    trecho = ms[k:k + sum(n for n, _ in grupos)]
+    formula, divisoes = lido_no_primeiro
+    pos = 0
+    for g, (n, texto) in enumerate(grupos):
+        m = trecho[pos]
+        if texto:
+            alvo = tuple(int(x) for x in texto.split('/'))
+            if g == 0:  # no 1º compasso, troca a fórmula lida (ou tira, se ela não mudava nada)
+                _definir_formula(m, None if alvo == antes else alvo)
+            elif alvo != formula:
+                _definir_formula(m, alvo)
+            formula = alvo
+        for mm in trecho[pos:pos + n]:
+            _definir_multirest(mm, 1)
+            _acertar_pausa(mm, formula, divisoes, sozinho=(n == 1))
+        _definir_multirest(m, n)
+        pos += n
+    if seguinte is not None and _formula(seguinte) is None and formula != formula_seguinte:
+        _definir_formula(seguinte, formula_seguinte)  # o que vem depois continua na fórmula que tinha
+
+
 def corrigir_trechos(arvore, correcoes):
-    """Ajusta o número de compassos de cada trecho de pausa. `correcoes`: {indice do trecho: compassos certos}.
-    Mantém o primeiro compasso (armadura, andamento) e o último (fermata, barra dupla/final) do trecho."""
-    correcoes = {int(k): int(v) for k, v in (correcoes or {}).items() if v not in (None, '')}
+    """Ajusta os trechos de pausa. `correcoes`: {indice do trecho: compassos certos} ou, para dividir o trecho em
+    grupos com fórmula de compasso própria, {indice: [(compassos, 'b/t' ou ''), ...]} — por exemplo
+    [(5, '3/4'), (3, '4/4'), (1, '')] para "5 em 3/4, 3 em 4/4 e 1". Ver validar_correcoes."""
+    correcoes = validar_correcoes(correcoes)
     if not correcoes:
         return []
     parte = partes(arvore)[0]
     medidas = parte.findall('measure')
+    vigentes = _vigentes(parte)
     feitas = []
-    for t in reversed(trechos_de_pausa(arvore)):
-        novo = correcoes.get(t['indice'])
-        if novo is None or novo == t['lidos']:
+    for t in reversed(trechos_de_pausa(arvore)):  # de trás para frente: os índices de antes não mudam
+        pedido = correcoes.get(t['indice'])
+        if pedido is None:
             continue
-        if not 1 <= novo <= 999:
-            raise ValueError(f'Trecho {t["indice"]}: número de compassos inválido ({novo}).')
-        grupo = medidas[t['inicio'] - 1:t['fim']]
-        primeiro, ultimo = grupo[0], grupo[-1]
-        if novo == 1:
-            barras = [b for b in ultimo.findall('barline') if b.get('location', 'right') == 'right']
-            for m in grupo[1:]:
-                parte.remove(m)
-            if ultimo is not primeiro:
-                for b in primeiro.findall('barline'):
-                    if b.get('location', 'right') == 'right':
-                        primeiro.remove(b)
-                for b in barras:
-                    primeiro.append(copy.deepcopy(b))
+        grupos = pedido if isinstance(pedido, list) else None
+        novo = sum(n for n, _ in grupos) if grupos else pedido
+        if grupos is None and novo == t['lidos']:
+            continue
+        primeiro = _redimensionar(parte, medidas[t['inicio'] - 1:t['fim']], novo)
+        feita = {'indice': t['indice'], 'lidos': t['lidos'], 'corrigido': novo}
+        if grupos:
+            seguinte = medidas[t['fim']] if t['fim'] < len(medidas) else None
+            _aplicar_grupos(parte, primeiro, grupos, vigentes[t['inicio'] - 2][0] if t['inicio'] > 1 else None,
+                            vigentes[t['inicio'] - 1], seguinte, vigentes[t['fim']][0] if seguinte is not None else None)
+            feita['grupos'] = [[n, f] for n, f in grupos]
         else:
-            meio = grupo[1:-1]
-            for m in meio:
-                parte.remove(m)
-            if ultimo is primeiro:  # trecho de 1 compasso que vira N: cria os N-1 depois dele
-                barras = [b for b in primeiro.findall('barline') if b.get('location', 'right') == 'right']
-                for b in barras:
-                    primeiro.remove(b)
-                pos = list(parte).index(primeiro) + 1
-                novos = [ET.Element('measure') for _ in range(novo - 1)]
-                for k, nm in enumerate(novos):
-                    parte.insert(pos + k, nm)
-                for b in barras:
-                    novos[-1].append(b)
-            else:
-                pos = list(parte).index(primeiro) + 1
-                for k in range(novo - 2):
-                    parte.insert(pos + k, ET.Element('measure'))
-        _definir_multirest(primeiro, novo)
-        feitas.append({'indice': t['indice'], 'lidos': t['lidos'], 'corrigido': novo})
+            _definir_multirest(primeiro, novo)
+        feitas.append(feita)
     numerar(arvore)
     return list(reversed(feitas))
+
+
+def situar_trechos(base, correcoes=None):
+    """Os trechos como o motor leu (`trechos_de_pausa(..., com_elementos=True)` antes das correções), com a posição
+    e o número de compassos que ficaram depois delas. Os índices são os do motor: é a eles que as correções se
+    referem, mesmo quando uma fórmula de compasso informada divide o trecho em dois na partitura final."""
+    correcoes = validar_correcoes(correcoes)
+    saida = []
+    for t in base:
+        pedido = correcoes.get(t['indice'])
+        grupos = pedido if isinstance(pedido, list) else None
+        n = sum(g for g, _ in grupos) if grupos else (pedido or t['lidos'])
+        inicio = int(t['_medidas'][0].get('number'))
+        saida.append({'indice': t['indice'], 'inicio': inicio, 'fim': inicio + n - 1, 'lidos': n, 'motor': t['lidos'],
+                      'compasso': t['compasso'], 'grupos_motor': t['grupos'],
+                      'grupos': [[g, f] for g, f in grupos] if grupos else None})
+    return saida
+
 
 
 # ---------------------------------------------------------------- cabeçalho

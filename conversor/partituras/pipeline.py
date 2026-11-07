@@ -97,9 +97,11 @@ def acabar(conv, opcoes, correcoes=None, progresso=_nada):
     arvore = mx.ler(bruto)
     mx.normalizar_multirests(arvore)
     ligaduras = mx.ligaduras_de_valor(arvore)
+    base = mx.trechos_de_pausa(arvore, com_elementos=True)  # como o motor leu: os índices das correções
     feitas = mx.corrigir_trechos(arvore, correcoes) if correcoes else []
     textos = mx.ajustar(arvore, opcoes.titulo, opcoes.instrumento, opcoes.compositor)
-    rel = conferencia.analisar(arvore, opcoes.motor, opcoes.ultimo_compasso, ligaduras, textos)
+    rel = conferencia.analisar(arvore, opcoes.motor, opcoes.ultimo_compasso, ligaduras, textos,
+                               trechos=mx.situar_trechos(base, correcoes))
     rel['correcoes'] = feitas
     versoes = conv / 'versoes'
     versoes.mkdir(exist_ok=True)

@@ -1,4 +1,5 @@
 """Leitura e preparação das páginas: fotos (HEIC/JPG/PNG...) ou PDF."""
+import math
 import subprocess
 from pathlib import Path
 
@@ -15,6 +16,16 @@ EXTENSOES = EXTENSOES_IMAGEM | {'.pdf'}
 # Distância entre linhas da pauta (px) entregue ao Audiveris. Em fotos de celular (~22 px) ele não reconheceu
 # cabeças de nota vazias numa das páginas; ampliando para ~32 px passou a reconhecer parte delas.
 INTERLINHA_ALVO = 32
+# O Audiveris recusa páginas com mais de 20 milhões de pixels ("Too large image"): fotos de câmeras de 37 MP
+# ou mais são reduzidas até este limite, com folga.
+PIXELS_MAX_AUDIVERIS = 18_000_000
+
+
+def fator_audiveris(largura, altura, interlinha):
+    """Escala da página para o Audiveris: amplia até a interlinha alvo (no máximo 3x), mas sem passar do limite
+    de pixels por página — nesse caso reduz, mesmo que a interlinha fique abaixo do alvo."""
+    fator = 1.0 if not interlinha else min(max(INTERLINHA_ALVO / interlinha, 1.0), 3.0)
+    return min(fator, math.sqrt(PIXELS_MAX_AUDIVERIS / (largura * altura)))
 
 
 def abrir_imagem(caminho, giro=0):
@@ -88,14 +99,15 @@ def estimar_interlinha(g):
 
 
 def preparar_audiveris(imagens, pasta, avisar=print):
-    """Recorta, amplia até a interlinha alvo e junta tudo num PDF sem perda (as páginas viram uma obra só)."""
+    """Recorta, ajusta a escala (interlinha alvo, sem passar do limite de pixels do Audiveris) e junta tudo
+    num PDF sem perda (as páginas viram uma obra só)."""
     pasta = Path(pasta)
     arquivos, info = [], []
     for i, (nome, im) in enumerate(imagens, 1):
         g = recortar_papel(im.convert('L'))
         inter = estimar_interlinha(g)
-        fator = 1.0 if not inter else min(max(INTERLINHA_ALVO / inter, 1.0), 3.0)
-        if fator > 1.01:
+        fator = fator_audiveris(g.width, g.height, inter)
+        if abs(fator - 1) > 0.01:
             g = g.resize((round(g.width * fator), round(g.height * fator)), Image.LANCZOS)
         g = ImageOps.autocontrast(g, cutoff=1)
         g.info.pop('icc_profile', None)  # perfil de cor RGB da foto não vale para tons de cinza
@@ -103,7 +115,8 @@ def preparar_audiveris(imagens, pasta, avisar=print):
         g.save(f)
         arquivos.append(f)
         info.append({'pagina': i, 'nome': nome, 'interlinha': inter, 'ampliacao': round(fator, 2)})
-        avisar(f'página {i}: interlinha {inter:.0f} px, ampliação {fator:.2f}x' if inter else f'página {i}: interlinha não medida')
+        escala = f'ampliação {fator:.2f}x' if fator >= 1 else f'redução {fator:.2f}x (limite de pixels do Audiveris)'
+        avisar(f'página {i}: interlinha {inter:.0f} px, {escala}' if inter else f'página {i}: interlinha não medida, {escala}')
     pdf = pasta / 'partitura.pdf'
     r = subprocess.run(['magick', *map(str, arquivos), '-compress', 'Zip', '-density', '300', str(pdf)],
                        capture_output=True, text=True)

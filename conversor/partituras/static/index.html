@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Central de Partituras</title>
+<link rel="icon" href="/static/icone.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topo">
+  <div class="marca">
+    <img src="/static/icone.svg" alt="" width="28" height="28">
+    <h1>Central de Partituras</h1>
+  </div>
+  <nav class="abas" role="tablist" aria-label="Seções">
+    <button role="tab" id="aba-musicas" data-vista="musicas" aria-selected="true">Músicas</button>
+    <button role="tab" id="aba-entrada" data-vista="entrada" aria-selected="false">Caixa de entrada <span class="contador" id="cont-entrada"></span></button>
+  </nav>
+  <div class="acoes-topo">
+    <button class="botao primario" id="bt-importar">+ Importar fotos ou PDF</button>
+    <button class="botao fantasma" id="bt-ajuda">Ajuda</button>
+    <button class="botao fantasma icone" id="bt-tema" title="Trocar tema claro/escuro" aria-label="Trocar tema claro/escuro">◐</button>
+  </div>
+  <input type="file" id="arquivos" multiple accept=".heic,.heif,.jpg,.jpeg,.png,.tif,.tiff,.webp,.bmp,.pdf" hidden>
+</header>
+
+<section class="kpis" id="kpis" aria-label="Resumo"></section>
+
+<main>
+  <section id="vista-musicas" class="vista vista-musicas">
+    <aside class="lateral" aria-label="Lista de músicas">
+      <div class="filtros" id="filtros" role="group" aria-label="Filtrar músicas"></div>
+      <input type="search" id="busca" class="campo" placeholder="Buscar música…" aria-label="Buscar música">
+      <ul class="lista" id="lista"></ul>
+      <div class="lateral-rodape">
+        <button class="botao fantasma" id="bt-exportar-sel" disabled>Exportar selecionadas (.zip)</button>
+      </div>
+    </aside>
+    <article class="editor" id="editor" aria-live="polite"></article>
+  </section>
+  <section id="vista-entrada" class="vista vista-entrada" hidden></section>
+</main>
+
+<footer class="fila" id="fila" aria-live="polite"></footer>
+
+<div class="soltar" id="soltar" hidden><div>Solte as fotos ou PDFs para importar</div></div>
+<div class="dica" id="dica" role="tooltip" hidden></div>
+<dialog id="dialogo" aria-modal="true"></dialog>
+<div class="avisos" id="avisos" aria-live="assertive"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

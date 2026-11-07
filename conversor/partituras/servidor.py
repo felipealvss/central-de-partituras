@@ -111,7 +111,7 @@ def criar_app(b, fila, token):
     # ------------------------------------------------------------ músicas
     @app.get('/api/musicas')
     def listar():
-        return {'musicas': b.listar(), 'saida_padrao': str(b.partituras)}
+        return {'musicas': b.listar(), 'saida_padrao': str(b.partituras), 'casa': str(Path.home())}
 
     @app.post('/api/musicas')
     def criar():
@@ -282,6 +282,16 @@ def criar_app(b, fila, token):
     @app.post('/api/musicas/<mid>/revisao')
     def preparar_revisao(mid):
         return {'trabalhos': fila.enfileirar_revisao(mid)}
+
+    @app.post('/api/musicas/<mid>/abrir-revisao')
+    def abrir_revisao(mid):
+        m = b.ler(mid)
+        ultima = next((r for r in reversed(m.get('revisoes', [])) if r.get('ok') and r.get('pasta')), None)
+        base = (b.musicas / m['id'] / 'revisao').resolve()
+        if not ultima or not Path(ultima['pasta']).resolve().is_relative_to(base) or not Path(ultima['pasta']).is_dir():
+            raise NaoEncontrado('Pacote de revisão não encontrado.')
+        sistema.abrir(ultima['pasta'])
+        return {'ok': True}
 
     @app.post('/api/encerrar')
     def encerrar():

@@ -220,5 +220,39 @@ class TestImportarPorLink(Base):
         self.assertEqual(f.estado()['fila'], [])
 
 
+
+@unittest.skipUnless(os.environ.get('CENTRAL_PY_AUDIO') and (Path(__file__).parent / 'dados' / 'audio' / 'saxophone.flac').exists(),
+                     'ponta a ponta: defina CENTRAL_PY_AUDIO (Python do ambiente de áudio) e tenha os dados do piloto')
+class TestPontaAPonta(Base):
+    """API → fila → trabalhador de áudio REAL → versão, com o cache de stems do piloto (sem separar de novo)."""
+
+    def test_importar_converter_e_refazer(self):
+        import shutil as sh
+        from partituras import caminhos
+        from partituras.audio import mega53
+        dados = Path(__file__).parent / 'dados' / 'audio'
+        self.fila.comando_audio = lambda t: [os.environ['CENTRAL_PY_AUDIO'], '-m', 'partituras.audio.trabalho', str(t)]
+        m = self.enviar_audio(instrumento='sax-tenor').get_json()['musica']
+        pasta = self.b.musicas / m['id'] / 'audio'
+        sh.copyfile(dados / 'mistura.flac', pasta / 'mistura.flac')
+        cache = pasta / 'separacao' / mega53.VERSAO
+        cache.mkdir(parents=True)
+        for stem in ('saxophone', 'trumpet', 'trombone', 'vocal'):
+            sh.copyfile(dados / f'{stem}.flac', cache / f'{stem}.flac')
+        (cache / 'separacao.json').write_text(json.dumps({'modelo': mega53.VERSAO, 'presenca': {'saxophone': 0.155}}))
+        with mock.patch.dict(os.environ, {'CENTRAL_PARTITURAS_RAIZ': str(self.tmp / 'raiz')}):
+            self.assertEqual(self.envia('post', f"/api/musicas/{m['id']}/converter").status_code, 200)
+            self.assertTrue(esperar(lambda: self.b.ler(m['id'])['estado'] in ('rascunho', 'rascunho_alertas', 'erro'), 600))
+        conv = self.b.ler(m['id'])['conversoes'][-1]
+        self.assertEqual(conv['estado'], 'ok', conv.get('erro'))
+        v = conv['versoes'][-1]
+        self.assertEqual((v['resumo']['trechos'], v['resumo']['compasso']), (11, '4/4'))
+        self.assertTrue(all(Path(p).exists() for p in v['publicados'].values()))
+        conf = self.get(f"/api/musicas/{m['id']}/conversoes/{conv['id']}/versoes/1/conferencia").get_json()
+        self.assertEqual((conf['tipo'], conf['tom_escrito']), ('audio', 'Ré♭ maior'))
+        r = self.get(f"/api/musicas/{m['id']}/conversoes/{conv['id']}/versoes/1/sintese.flac", headers={'Range': 'bytes=0-9'})
+        self.assertEqual(r.status_code, 206)
+        r.close()
+
 if __name__ == '__main__':
     unittest.main()

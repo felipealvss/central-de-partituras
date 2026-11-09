@@ -18,6 +18,11 @@
 /conversor/audiveris/
 /conversor/tessdata/
 
+# Modo de áudio (instalar.sh --audio): ambiente Python, modelos e o uv
+/conversor/.venv-audio/
+/conversor/modelos-audio/
+/conversor/.uv/
+
 # Dados reais de uma partitura protegida por direitos autorais (foto, leituras
 # dos motores, transcrição), usados como referência nos testes. Sem eles,
 # esses testes são pulados.

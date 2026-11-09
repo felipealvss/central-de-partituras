@@ -12,6 +12,7 @@ import secrets
 import signal
 import socket
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -325,6 +326,9 @@ def _avisar(resumo):
 
 def main():
     caminhos.ESTADO.mkdir(parents=True, exist_ok=True)
+    # O waitress guarda corpos grandes (envios de áudio) em arquivos temporários; o /tmp do Fedora fica na memória.
+    caminhos.TEMPORARIOS.mkdir(parents=True, exist_ok=True)
+    tempfile.tempdir = str(caminhos.TEMPORARIOS)
     trava = open(caminhos.ESTADO / 'servidor.lock', 'w')
     try:
         fcntl.flock(trava, fcntl.LOCK_EX | fcntl.LOCK_NB)

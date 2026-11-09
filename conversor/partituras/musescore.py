@@ -20,11 +20,13 @@ def _mscore():
     return exe
 
 
-def converter(origem, destino, log=None, timeout=300):
-    """origem/destino por extensão: .musicxml → .mscz, .mscz → .pdf/.png/.musicxml."""
+def converter(origem, destino, log=None, timeout=300, estilo=None):
+    """origem/destino por extensão: .musicxml → .mscz, .mscz → .pdf/.png/.musicxml.
+    estilo: arquivo .mss aplicado na conversão (ex.: pausas de vários compassos)."""
     destino = Path(destino)
     destino.unlink(missing_ok=True)  # destino é sempre um arquivo da pasta de trabalho
-    rodar([_mscore(), '-o', destino, origem], timeout=timeout, env=_env(), log=log, nome='MuseScore')
+    cmd = [_mscore(), *(['-S', estilo] if estilo else []), '-o', destino, origem]
+    rodar(cmd, timeout=timeout, env=_env(), log=log, nome='MuseScore')
     if not destino.exists():
         raise ErroConversao(f'O MuseScore não conseguiu gerar {destino.suffix}.')
     return destino

@@ -14,12 +14,24 @@ from datetime import datetime
 from pathlib import Path
 
 from . import fotos
+from .audio import instrumentos as inst_audio
 from .imagens import EXTENSOES
 from .publicar import nome_seguro, para_lixeira
 
 FORMATO = 1
 MOTORES = ('homr', 'audiveris', 'ambos')
 CHECKLIST = ('pausas', 'ligaduras', 'dinamicas', 'ouvida')
+CHECKLIST_AUDIO = ('trechos', 'ritmo', 'notas', 'ouvida')
+# Campos do áudio de uma música que o trabalhador pode informar (download e leitura do arquivo).
+CAMPOS_AUDIO = ('arquivo', 'nome_original', 'codec', 'taxa', 'canais', 'kbps', 'duracao', 'com_perdas', 'hash',
+                'tamanho', 'aviso', 'titulo_original')
+
+
+TITULO_LINK = 'Áudio de link'  # título provisório enquanto o link é baixado
+
+
+def _checklist(m):
+    return CHECKLIST_AUDIO if m.get('fonte') == 'audio' else CHECKLIST
 
 
 class Conflito(Exception):
@@ -234,6 +246,65 @@ class Biblioteca:
                     m[k] = v
             return self._salvar(m)
 
+    def criar_audio(self, titulo, instrumento_alvo=None, arquivo=None, nome_original=None, info=None, hash_=None,
+                    url=None):
+        """Música a partir de um áudio: um arquivo já recebido (movido para audio/original.<ext>) ou um link que a
+        fila ainda vai baixar."""
+        try:
+            inst = inst_audio.obter(instrumento_alvo or inst_audio.PADRAO)
+        except ValueError as e:
+            raise Invalido(str(e)) from None
+        titulo = (titulo or '').strip() or (Path(nome_original).stem if nome_original else '') or 'Música sem título'
+        with self._trava:
+            mid = self._novo_id(titulo)
+            pasta = self.musicas / mid
+            (pasta / 'audio').mkdir(parents=True)
+            (pasta / 'conversoes').mkdir()
+            audio = {'origem': 'link' if url else 'arquivo', 'url': url, 'nome_original': nome_original,
+                     'estado': 'baixando' if url else 'pronto', 'erro': None}
+            if arquivo:
+                destino = pasta / 'audio' / f'original{Path(nome_original or arquivo).suffix.lower()}'
+                try:
+                    os.replace(arquivo, destino)
+                except OSError:  # outro sistema de arquivos
+                    shutil.move(arquivo, destino)
+                audio.update({k: v for k, v in (info or {}).items() if k in CAMPOS_AUDIO})
+                audio.update(arquivo=destino.name, hash=hash_, tamanho=destino.stat().st_size)
+            m = {'formato': FORMATO, 'id': mid, 'titulo': titulo, 'fonte': 'audio', 'instrumento_alvo': inst['id'],
+                 'instrumento': inst['nome'], 'compositor': '', 'ultimo_compasso': None, 'clave': None, 'paginas': [],
+                 'motor': None, 'opcoes': {'pdf': True, 'guias': None}, 'saida': {'pasta': None, 'nome': None},
+                 'estado': 'baixando' if url else 'nova', 'revisada': False,
+                 'checklist': {k: False for k in CHECKLIST_AUDIO}, 'audio': audio, 'conversoes': [], 'revisao': 1,
+                 'criada': agora()}
+            return self._salvar(m)
+
+    def registrar_audio(self, mid, resultado):
+        """Resultado do download de um link: guarda as características do áudio (ou o erro)."""
+        with self._trava:
+            m = self.ler(mid)
+            if m is None:
+                raise NaoEncontrado('Música não encontrada.')
+            a = m.setdefault('audio', {})
+            if resultado.get('ok'):
+                a.update({k: v for k, v in (resultado.get('audio') or {}).items() if k in CAMPOS_AUDIO})
+                a['estado'], a['erro'] = 'pronto', None
+                if a.get('titulo_original') and m['titulo'] == TITULO_LINK:  # título em branco: usa o do vídeo
+                    m['titulo'] = str(a['titulo_original'])[:200]
+            else:
+                a['estado'], a['erro'] = resultado.get('estado_audio') or 'erro', resultado.get('erro')
+            m['estado'] = self._estado_da_ultima(m)
+            m['revisao'] += 1
+            return self._salvar(m)
+
+    def audios_por_hash(self):
+        """{hash do áudio: id da música}, para recusar o mesmo áudio importado duas vezes."""
+        return {m['audio']['hash']: m['id'] for m in self.listar()
+                if m.get('fonte') == 'audio' and (m.get('audio') or {}).get('hash')}
+
+    def caminho_audio(self, m):
+        a = m.get('audio') or {}
+        return self.musicas / m['id'] / 'audio' / a['arquivo'] if a.get('arquivo') else None
+
     def _mover_para(self, m, origens, giros):
         """Move arquivos da caixa de entrada para as páginas da música, em ordem de hora."""
         infos = sorted((self.info_foto(o) | {'origem': o} for o in origens), key=lambda f: f['hora'])
@@ -256,7 +327,20 @@ class Biblioteca:
             return self._salvar(m)
 
     def _aplicar(self, m, chave, valor):
-        if chave in ('titulo', 'instrumento', 'compositor'):
+        if m.get('fonte') == 'audio' and chave in ('motor', 'clave', 'paginas'):
+            raise Invalido('Esse campo não se aplica a músicas de áudio.')
+        if chave == 'instrumento_alvo':
+            if m.get('fonte') != 'audio':
+                raise Invalido('Só músicas de áudio têm instrumento-alvo.')
+            try:
+                novo = inst_audio.obter(valor)
+            except ValueError as e:
+                raise Invalido(str(e)) from None
+            antigo = inst_audio.INSTRUMENTOS.get(m.get('instrumento_alvo'), {}).get('nome')
+            if not m.get('instrumento') or m.get('instrumento') == antigo:
+                m['instrumento'] = novo['nome']
+            m['instrumento_alvo'] = novo['id']
+        elif chave in ('titulo', 'instrumento', 'compositor'):
             m[chave] = str(valor or '').strip()[:200]
         elif chave == 'ultimo_compasso':
             if valor in (None, ''):
@@ -293,7 +377,7 @@ class Biblioteca:
             m['paginas'] = [dict(atuais[a], giro=int(p.get('giro', atuais[a]['giro'])) % 360 if isinstance(p, dict)
                                  else atuais[a]['giro']) for a, p in zip(novos, valor)]
         elif chave == 'checklist':
-            m['checklist'] = {k: bool((valor or {}).get(k)) for k in CHECKLIST}
+            m['checklist'] = {k: bool((valor or {}).get(k)) for k in _checklist(m)}
         elif chave == 'revisada':
             m['revisada'] = bool(valor)
             if valor and not (m.get('final') or {}).get('publicados'):
@@ -308,6 +392,8 @@ class Biblioteca:
     def adicionar_paginas(self, mid, arquivos_entrada):
         with self._trava:
             m = self.ler(mid)
+            if m.get('fonte') == 'audio':
+                raise Invalido('Músicas de áudio não têm páginas.')
             origens = [self._na_entrada(a) for a in arquivos_entrada]
             self._mover_para(m, origens, self._giros_entrada())
             m['revisao'] += 1
@@ -317,6 +403,8 @@ class Biblioteca:
         """Tira a página da música e devolve a foto para a caixa de entrada."""
         with self._trava:
             m = self.ler(mid)
+            if m.get('fonte') == 'audio':
+                raise Invalido('Músicas de áudio não têm páginas.')
             pag = next((p for p in m['paginas'] if p['arquivo'] == arquivo), None)
             if pag is None:
                 raise NaoEncontrado(f'Página "{arquivo}" não está nesta música.')
@@ -349,7 +437,7 @@ class Biblioteca:
             raise NaoEncontrado(f'Conversão "{cid}" não encontrada.')
         return pasta
 
-    def nova_conversao(self, mid, motor, lote=None):
+    def nova_conversao(self, mid, motor, lote=None, **extra):
         with self._trava:
             m = self.ler(mid)
             cid = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{motor}"
@@ -360,7 +448,7 @@ class Biblioteca:
                 n += 1
             pasta.mkdir(parents=True)
             m['conversoes'].append({'id': pasta.name, 'motor': motor, 'lote': lote, 'quando': agora(),
-                                    'estado': 'na_fila', 'versoes': []})
+                                    'estado': 'na_fila', 'versoes': [], **extra})
             m['revisao'] += 1
             self._salvar(m)
             return pasta.name, pasta
@@ -373,7 +461,9 @@ class Biblioteca:
                 if conv is not None:
                     conv['estado'] = estado
                     conv.update(extra)
-            m['estado'] = estado if estado in ('na_fila', 'convertendo') else self._estado_da_ultima(m)
+            if estado == 'baixando' and m.get('audio'):
+                m['audio']['estado'] = 'baixando'
+            m['estado'] = estado if estado in ('na_fila', 'convertendo', 'baixando') else self._estado_da_ultima(m)
             m['revisao'] += 1
             return self._salvar(m)
 
@@ -384,6 +474,11 @@ class Biblioteca:
             conv = next((c for c in m['conversoes'] if c['id'] == cid), None)
             if conv is None:
                 raise NaoEncontrado(f'Conversão "{cid}" não encontrada.')
+            for k in ('separacao', 'segmentacao', 'instrumento'):  # dados que o trabalhador de áudio informa
+                if (resultado.get('conversao') or {}).get(k) is not None:
+                    conv[k] = resultado['conversao'][k]
+            if resultado.get('audio') and m.get('audio') is not None:
+                m['audio'].update({k: v for k, v in resultado['audio'].items() if k in ('presenca',)})
             if resultado.get('ok'):
                 conv['estado'] = 'ok'
                 conv['erro'] = None
@@ -402,7 +497,8 @@ class Biblioteca:
             return 'revisada'
         conversoes = [c for c in m['conversoes'] if c.get('estado') != 'legado']
         if not conversoes:
-            return 'nova'
+            estado_audio = (m.get('audio') or {}).get('estado')
+            return {'baixando': 'baixando', 'erro': 'erro', 'interrompido': 'interrompida'}.get(estado_audio, 'nova')
         ultima = conversoes[-1]
         if ultima['estado'] in ('na_fila', 'convertendo', 'cancelada', 'interrompida'):
             return ultima['estado']

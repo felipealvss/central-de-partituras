@@ -8,14 +8,18 @@ X-Central. O navegador nunca envia caminhos de arquivo: só identificadores de m
 """
 import fcntl
 import os
+import re
 import secrets
+import shutil
 import signal
 import socket
 import sys
 import tempfile
 import threading
 import time
+import uuid
 from pathlib import Path
+from urllib.parse import urlparse
 
 from flask import Flask, abort, jsonify, redirect, request, send_file, send_from_directory
 
@@ -24,11 +28,24 @@ from . import musicxml as mx
 from .biblioteca import Biblioteca, Conflito, Invalido, NaoEncontrado, _gravar_json
 from .erros import ErroConversao
 from .fila import Fila
+from .audio import disponivel as audio_disponivel
+from .audio import fonte as fonte_audio
+from .audio import instrumentos
+from .audio import mega53
 
 ESTATICOS = Path(__file__).resolve().parent / 'static'
 PORTAS = range(8765, 8786)
 INATIVIDADE = 180  # segundos sem a janela aberta e com a fila vazia → o servidor encerra
 ARQUIVOS_DA_VERSAO = {'partitura.pdf', 'partitura.musicxml', 'conferencia.txt'}
+# Arquivos extras de uma versão de música de áudio (conferência): imagens por trecho, síntese e notas.
+ARQUIVOS_DA_VERSAO_AUDIO = re.compile(r'trecho-\d{2,3}\.png|sintese\.flac|notas\.json|partitura-som-real\.musicxml')
+AUDIOS = {'original', 'mistura', *instrumentos.STEMS}
+TIPOS = {'.flac': 'audio/flac', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.oga': 'audio/ogg',
+         '.opus': 'audio/ogg', '.m4a': 'audio/mp4', '.mp4': 'audio/mp4', '.aac': 'audio/aac', '.webm': 'audio/webm',
+         '.mka': 'audio/x-matroska', '.aif': 'audio/aiff', '.aiff': 'audio/aiff', '.wma': 'audio/x-ms-wma',
+         '.png': 'image/png', '.json': 'application/json', '.pdf': 'application/pdf', '.txt': 'text/plain',
+         '.musicxml': 'application/vnd.recordare.musicxml+xml'}
+DURACAO_MAXIMA = 20 * 60  # segundos de áudio por música (separação de 3× a duração numa GPU de 4 GB)
 
 
 def _resumo_motores():
@@ -39,13 +56,19 @@ def criar_app(b, fila, token):
     app = Flask(__name__, static_folder=None)
     app.config['MAX_CONTENT_LENGTH'] = 400 * 1024 * 1024
     app.config['ultimo_sinal'] = time.monotonic()
-    cache = {'motores': (0.0, None)}
+    cache = {'motores': (0.0, None), 'audio': (0.0, None)}
 
     def motores_cache():
         t, valor = cache['motores']
         if valor is None or time.monotonic() - t > 60:
             cache['motores'] = (time.monotonic(), _resumo_motores())
         return cache['motores'][1]
+
+    def audio_cache():
+        t, valor = cache['audio']
+        if valor is None or time.monotonic() - t > 60:
+            cache['audio'] = (time.monotonic(), audio_disponivel.estado())
+        return cache['audio'][1]
 
     # ------------------------------------------------------------ proteção
     @app.before_request
@@ -101,7 +124,7 @@ def criar_app(b, fila, token):
     @app.get('/api/estado')
     def estado():
         app.config['ultimo_sinal'] = time.monotonic()  # a janela está aberta
-        return {'fila': fila.estado(), 'motores': motores_cache(),
+        return {'fila': fila.estado(), 'motores': motores_cache(), 'audio': audio_cache(),
                 'revisoes': {m['id']: m['revisao'] for m in b.listar()},
                 'entrada': len(b._arquivos(b.entrada))}
 
@@ -113,7 +136,8 @@ def criar_app(b, fila, token):
     # ------------------------------------------------------------ músicas
     @app.get('/api/musicas')
     def listar():
-        return {'musicas': b.listar(), 'saida_padrao': str(b.partituras), 'casa': str(Path.home())}
+        return {'musicas': b.listar(), 'saida_padrao': str(b.partituras), 'casa': str(Path.home()),
+                'instrumentos_audio': instrumentos.para_interface(), 'instrumento_padrao': instrumentos.PADRAO}
 
     @app.post('/api/musicas')
     def criar():
@@ -132,6 +156,7 @@ def criar_app(b, fila, token):
 
     @app.delete('/api/musicas/<mid>')
     def excluir(mid):
+        fila.cancelar_da_musica(Path(mid).name)  # o trabalho em andamento não pode recriar a pasta apagada
         b.excluir(mid)
         return {'ok': True}
 
@@ -206,6 +231,11 @@ def criar_app(b, fila, token):
     @app.post('/api/musicas/<mid>/conversoes/<cid>/acabar')
     def acabar(mid, cid):
         d = corpo()
+        m = b.ler(Path(mid).name)
+        if m and m.get('fonte') == 'audio':
+            return {'trabalhos': fila.enfileirar(mid, 'acabar', cid=cid,
+                                                 correcoes=instrumentos.validar_ajustes(d.get('ajustes')),
+                                                 substituir=bool(d.get('substituir')))}
         correcoes = {str(k): [list(g) for g in v] if isinstance(v, list) else v
                      for k, v in mx.validar_correcoes(d.get('correcoes')).items()}
         return {'trabalhos': fila.enfileirar(mid, 'acabar', cid=cid, correcoes=correcoes,
@@ -221,10 +251,85 @@ def criar_app(b, fila, token):
 
     @app.get('/api/musicas/<mid>/conversoes/<cid>/versoes/<int:n>/<nome>')
     def arquivo_versao(mid, cid, n, nome):
-        if nome not in ARQUIVOS_DA_VERSAO:
+        m = b.ler(Path(mid).name)
+        de_audio = bool(m and m.get('fonte') == 'audio' and ARQUIVOS_DA_VERSAO_AUDIO.fullmatch(nome))
+        if nome not in ARQUIVOS_DA_VERSAO and not de_audio:
             abort(404)
         arq = b.pasta_conversao(mid, cid) / 'versoes' / f'{n:02d}' / nome
-        return send_file(arq) if arq.is_file() else abort(404)
+        if not arq.is_file():
+            abort(404)
+        return send_file(arq, mimetype=TIPOS.get(arq.suffix), conditional=True)
+
+    # ------------------------------------------------------------ áudio
+    @app.put('/api/audio/arquivo/<nome>')
+    def enviar_audio(nome):
+        nome = Path(nome).name
+        if not fonte_audio.e_audio(nome):
+            raise Invalido(f'"{nome}" não é um arquivo de áudio aceito.')
+        caminhos.TEMPORARIOS.mkdir(parents=True, exist_ok=True)
+        tmp = caminhos.TEMPORARIOS / f'{uuid.uuid4().hex}.parcial'
+        try:
+            with open(tmp, 'wb') as f:
+                shutil.copyfileobj(request.stream, f, 1 << 20)
+            if tmp.stat().st_size == 0:
+                raise Invalido('O arquivo chegou vazio.')
+            h = fonte_audio.identificar(tmp)
+            existente = b.audios_por_hash().get(h)
+            if existente:
+                return erro(409, f'Este áudio já foi importado (música "{existente}").', onde=existente)
+            try:
+                info = fonte_audio.sondar(tmp)
+            except ErroConversao as e:
+                raise Invalido(str(e)) from None
+            if info['duracao'] > DURACAO_MAXIMA:
+                raise Invalido(f'Áudios de até {DURACAO_MAXIMA // 60} minutos (este tem {info["duracao"] / 60:.0f}).')
+            m = b.criar_audio(request.args.get('titulo'), request.args.get('instrumento'), arquivo=tmp,
+                              nome_original=nome, info=info, hash_=h)
+        finally:
+            tmp.unlink(missing_ok=True)
+        resposta = {'musica': m, 'trabalhos': []}
+        if request.args.get('converter') == '1':
+            try:
+                resposta['trabalhos'] = fila.enfileirar(m['id'], 'converter')
+            except ValueError as e:  # ex.: modo de áudio não instalado — a música fica criada
+                resposta['aviso'] = str(e)
+        return resposta, 201
+
+    @app.post('/api/audio/link')
+    def importar_link():
+        d = corpo()
+        url = str(d.get('url') or '').strip()
+        partes = urlparse(url)
+        if partes.scheme not in ('http', 'https') or not partes.netloc:
+            raise Invalido('Cole um link completo (começando com http:// ou https://).')
+        if '/playlist' in partes.path:
+            raise Invalido('Só um vídeo por vez: links de playlist não são aceitos.')
+        if not audio_disponivel.estado()['link'] and fila.verificar_motores:
+            raise Invalido('A importação por link precisa do modo de áudio instalado (rode conversor/instalar.sh --audio).')
+        from .biblioteca import TITULO_LINK
+        m = b.criar_audio(d.get('titulo') or TITULO_LINK, d.get('instrumento'), url=url)
+        try:
+            trabalhos = fila.enfileirar_baixar(m['id'], bool(d.get('converter', True)))
+        except ValueError as e:
+            b.registrar_audio(m['id'], {'ok': False, 'erro': str(e)})
+            raise
+        return {'musica': b.ler(m['id']), 'trabalhos': trabalhos}, 201
+
+    @app.get('/api/musicas/<mid>/audio/<qual>')
+    def audio_musica(mid, qual):
+        m = b.ler(Path(mid).name)
+        if not m or m.get('fonte') != 'audio' or qual not in AUDIOS:
+            abort(404)
+        pasta = b.musicas / m['id'] / 'audio'
+        if qual == 'original':
+            arq = b.caminho_audio(m)
+        elif qual == 'mistura':
+            arq = pasta / 'mistura.flac'
+        else:
+            arq = pasta / 'separacao' / mega53.VERSAO / f'{qual}.flac'
+        if not arq or not arq.is_file():
+            abort(404)
+        return send_file(arq, mimetype=TIPOS.get(arq.suffix.lower(), 'application/octet-stream'), conditional=True)
 
     @app.get('/api/musicas/<mid>/conversoes/<cid>/guias/<nome>')
     def guia(mid, cid, nome):

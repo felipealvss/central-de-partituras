@@ -42,8 +42,12 @@ def arquivos_finais(m):
 def _leia_me(m, conteudo):
     linhas = [f"{m['titulo']}" + (f" — {m['instrumento']}" if m.get('instrumento') else ''),
               f"Exportado pela Central de Partituras em {datetime.now():%d/%m/%Y %H:%M}.",
-              f"Situação: {'revisada' if m.get('revisada') else 'rascunho (revise no MuseScore antes de usar)'}.", '',
-              'Conteúdo:']
+              f"Situação: {'revisada' if m.get('revisada') else 'rascunho (revise no MuseScore antes de usar)'}."]
+    if m.get('fonte') == 'audio':
+        a = m.get('audio') or {}
+        origem = a.get('url') or a.get('nome_original') or 'arquivo de áudio'
+        linhas.append(f"Fonte: áudio ({origem}); o áudio não vai no pacote.")
+    linhas += ['', 'Conteúdo:']
     linhas += [f'  - {c}' for c in conteudo]
     return '\n'.join(linhas) + '\n'
 

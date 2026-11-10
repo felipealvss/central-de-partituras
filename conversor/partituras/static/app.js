@@ -65,6 +65,8 @@ const enc = encodeURIComponent;
 const musicaSel = () => est.musicas.find(m => m.id === est.selecionada) || null;
 const ocupada = m => ['na_fila', 'convertendo'].includes(m.estado) ||
   (est.fila.atual && est.fila.atual.musica === m.id) || est.fila.fila.some(j => j.musica === m.id);
+const rotuloOcupada = m => m.estado === 'convertendo' || (est.fila.atual && est.fila.atual.musica === m.id)
+  ? 'Convertendo…' : 'Na fila…';
 
 function hora(iso) {
   if (!iso) return '';
@@ -237,10 +239,22 @@ function trocarMusica(m) {
 }
 
 /* ------------------------------------------------------------------ editor */
+// O redesenho espera só por quem tem texto digitado e ainda não salvo (o campo salva ao sair dele). Foco num
+// seletor, numa caixa só de leitura ou num campo sem nada digitado não segura nada: antes, um foco esquecido
+// num campo deixava o editor parado (a conversão terminava e o relatório não aparecia).
 function editando() {
   const a = document.activeElement;
-  return a && a.matches('input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea') &&
-    a.closest('#editor, #vista-entrada');
+  return !!(a && a.matches('textarea, input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file])') &&
+    !a.readOnly && a.value !== a.defaultValue && a.closest('#editor, #vista-entrada'));
+}
+// Depois de redesenhar, devolve o foco ao campo equivalente (mesmo id), se o foco estava num campo do editor.
+function guardarFoco(raiz) {
+  const a = document.activeElement;
+  const id = a && a.id && a.closest(raiz) ? a.id : null;
+  return () => {
+    const n = id && document.getElementById(id);
+    if (n && n !== document.activeElement) n.focus({ preventScroll: true });
+  };
 }
 function renderEditor(forcar = false) {
   if (!forcar && editando()) { est.pendente = true; return; }
@@ -254,11 +268,13 @@ function renderEditor(forcar = false) {
     return;
   }
   const rolagem = ed.scrollTop;
+  const devolverFoco = guardarFoco('#editor');
   ed.replaceChildren(...limpos(m.fonte === 'audio'
     ? [cabecalho(m), blocoFinal(m), blocoAudio(m), blocoDadosAudio(m), blocoConversaoAudio(m), blocoRelatorio(m), blocoHistorico(m)]
     : [cabecalho(m), blocoFinal(m), blocoPaginas(m), blocoDados(m), blocoConversao(m), blocoRelatorio(m), blocoRevisaoClaude(m),
       blocoHistorico(m)]));
   ed.scrollTop = rolagem;
+  devolverFoco();
 }
 
 function campoTexto(m, chave, rotulo, attrs = {}) {
@@ -293,7 +309,7 @@ function cabecalho(m) {
     status(m.estado, true),
     el('div', { class: 'barra-acoes' },
       el('button', { class: 'botao primario', disabled: (m.fonte === 'audio' ? (m.audio || {}).estado !== 'pronto' : !m.paginas.length) || ocupada(m),
-        onclick: () => converter(m) }, ocupada(m) ? 'Na fila…' : m.fonte === 'audio' ? '▶ Separar e transcrever' : '▶ Converter'),
+        onclick: () => converter(m) }, ocupada(m) ? rotuloOcupada(m) : m.fonte === 'audio' ? '▶ Separar e transcrever' : '▶ Converter'),
       el('button', { class: 'botao', onclick: () => dialogoExportar([m.id]) }, 'Exportar .zip'),
       el('button', { class: 'botao fantasma perigo', onclick: () => excluir(m) }, 'Excluir')));
 }
@@ -419,7 +435,7 @@ function blocoConversao(m) {
           el('option', { value: 'sol', selected: m.opcoes.guias === 'sol' }, 'clave de sol (+1 min, usa o Audiveris)')))),
     el('p', { class: 'apagado pequeno', text: 'Nunca sobrescreve: se já existir um arquivo com esse nome, salva como “Nome (2)”.' }),
     el('button', { class: 'botao primario', disabled: !m.paginas.length || ocupada(m), onclick: () => converter(m) },
-      ocupada(m) ? 'Na fila…' : '▶ Converter agora'));
+      ocupada(m) ? rotuloOcupada(m) : '▶ Converter agora'));
 }
 
 async function converter(m) {
@@ -741,7 +757,7 @@ function correcaoTrechos(m, c, rel, chave) {
           aviso('Refazendo o acabamento com as pausas corrigidas…', 'ok');
           carregarMusicas();
         } catch (e) { falhou(e); }
-      } }, ocupado ? 'Na fila…' : 'Refazer acabamento')));
+      } }, ocupado ? rotuloOcupada(m) : 'Refazer acabamento')));
 }
 function detalhesRelatorio(rel) {
   const partes = [];

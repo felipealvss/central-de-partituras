@@ -181,7 +181,7 @@ function blocoConversaoAudio(m) {
       el('label', {}, el('input', { type: 'checkbox', checked: m.opcoes.pdf, onchange: e => salvar(m, { opcoes: { ...m.opcoes, pdf: e.target.checked } }) }), ' Gerar PDF')),
     el('p', { class: 'apagado pequeno', text: 'Nunca sobrescreve: se já existir um arquivo com esse nome, salva como “Nome (2)”.' }),
     el('button', { class: 'botao primario', disabled: !pronto || ocupada(m), onclick: () => converter(m) },
-      ocupada(m) ? 'Na fila…' : '▶ Separar e transcrever'));
+      ocupada(m) ? rotuloOcupada(m) : '▶ Separar e transcrever'));
 }
 
 /* ------------------------------------------------------------------ relatório */
@@ -246,7 +246,7 @@ function relatorioAudio(m, c, rel, chave) {
           aviso('Refazendo a transcrição com os ajustes…', 'ok');
           carregarMusicas();
         } catch (e) { falhou(e); }
-      } }, ocupada(m) ? 'Na fila…' : 'Refazer transcrição')));
+      } }, ocupada(m) ? rotuloOcupada(m) : 'Refazer transcrição')));
   const extensao = fora ? el('details', { class: 'mais' }, el('summary', { text: `Notas fora da extensão normal (${fora})` }),
     el('ul', {}, rel.fora_extensao.map(f => el('li', { text: `c. ${f.compasso}: ${f.nome || f.nota}${f.acima ? ' (acima da extensão normal)' : ' (abaixo da extensão)'}` })))) : null;
   return [blocos, linhaDoTempo(rel, aj, t => ouvir(t, t.incluido === false ? 'original' : 'transcricao')), lista, ajustes, extensao,

@@ -143,7 +143,7 @@ Para músicas importantes ou difíceis, a Central prepara tudo para uma revisão
 
 Além de fotos, a Central transcreve a linha de **um instrumento** numa gravação: ela separa o instrumento do resto da música, acha os trechos em que ele toca, lê as notas e escreve a parte já transposta para o instrumento escolhido.
 
-**Instalação (uma vez):** rode `conversor/instalar.sh --audio`. Ele cria um ambiente próprio (cerca de 6 GB, dentro de `conversor/`) e baixa os modelos de separação e de pulsação, conferindo a assinatura de cada um. Enquanto faltar algo, o diálogo de importação avisa o quê.
+**Instalação (uma vez):** rode `conversor/instalar.sh --audio`. Ele cria um ambiente próprio dentro de `conversor/`, baixa as bibliotecas (uns 3 GB, quase tudo o PyTorch com as bibliotecas da NVIDIA) e os modelos de separação e de pulsação (1,45 GB) e confere a assinatura de cada arquivo; no fim, ocupa cerca de 7,5 GB. Com o `aria2c` instalado (`sudo dnf install aria2`), os downloads grandes vêm por várias conexões ao mesmo tempo, o que faz muita diferença numa conexão que limita cada download. Precisa do `ffmpeg`. Se a instalação for interrompida (ou a internet cair), rode o mesmo comando de novo: ela continua de onde parou, sem baixar outra vez o que já veio. Enquanto faltar algo, o diálogo de importação avisa o quê.
 
 **Importar:** clique em **♫ Importar áudio** (ou arraste um arquivo de áudio para a janela). Escolha o arquivo — MP3, WAV, FLAC, M4A, OGG, WEBM… — ou cole o **link** de um vídeo (um só, sem playlists). Dê o título, escolha o **instrumento a transcrever** (sax tenor, alto, soprano ou barítono, trompete em Si♭ ou trombone; a escolha fica lembrada) e deixe marcado **Separar e transcrever em seguida**.
 

@@ -3,12 +3,14 @@
 Aviso que a interface repete: os Termos do YouTube não permitem baixar fora dos recursos do próprio site; usar o
 link fica por conta do usuário. O yt-dlp precisa de um interpretador de JavaScript (Node.js) para o YouTube e
 quebra com frequência quando o site muda: os erros aparecem como ele os escreve, com a dica de atualizá-lo.
+O yt-dlp fica no grupo de processos do trabalho (como os motores em processos.rodar): cancelar na fila encerra
+o grupo inteiro, yt-dlp junto. O tempo limite vale mesmo se ele parar de escrever.
 """
 import json
 import os
 import re
 import subprocess
-import time
+import threading
 from pathlib import Path
 
 from . import fonte
@@ -38,24 +40,37 @@ def executar(tarefa, progresso, timeout=1800):
     progresso('baixando', 'Baixando o áudio do link', None, None)
     log = []
     proc = subprocess.Popen(comando(yt_dlp, tarefa.get('node'), tarefa['url'], pasta), stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, text=True, start_new_session=True)
-    inicio = time.monotonic()
+                            stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace')
+    estourou = threading.Event()
+
+    def estourar():
+        estourou.set()
+        processos.parar(proc)
+
+    relogio = threading.Timer(timeout, estourar)
+    relogio.daemon = True
+    relogio.start()
     try:
         for linha in proc.stdout:
             log.append(linha.rstrip())
             m = PROGRESSO.search(linha)
             if m:
                 progresso('baixando', f'Baixando o áudio: {float(m.group(1)):.0f}%', int(float(m.group(1))), 100)
-            if time.monotonic() - inicio > timeout:
-                processos.encerrar_grupo(proc)
-                raise ErroConversao('O download passou do tempo limite.')
         proc.wait()
     finally:
-        if proc.poll() is None:
-            processos.encerrar_grupo(proc)
-    (pasta / 'download.log').write_text('\n'.join(log) + '\n', encoding='utf-8')
+        relogio.cancel()
+        processos.parar(proc)
+        (pasta / 'download.log').write_text('\n'.join(log) + '\n', encoding='utf-8')
+    if estourou.is_set():
+        raise ErroConversao(f'O download passou do tempo limite ({max(timeout // 60, 1)} min) e foi interrompido.')
     baixados = [p for p in pasta.glob('.baixando.*') if not p.name.endswith(('.info.json', '.part', '.ytdl'))]
     if proc.returncode != 0 or not baixados:
+        texto = '\n'.join(log)
+        if 'does not pass filter' in texto:
+            raise ErroConversao(f'O vídeo tem mais de {DURACAO_MAXIMA // 60} minutos: a Central aceita áudios até '
+                                'esse tamanho.')
+        if 'larger than max-filesize' in texto:
+            raise ErroConversao('O áudio desse vídeo passa de 400 MB.')
         erros = [x for x in log if 'ERROR' in x] or log[-3:]
         raise ErroConversao('O yt-dlp não conseguiu baixar: ' + ' / '.join(erros)[-500:] +
                             ' (se o problema continuar, atualize o yt-dlp: conversor/instalar.sh --atualizar-yt-dlp)')

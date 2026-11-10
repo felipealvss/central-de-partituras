@@ -27,7 +27,7 @@ conversor/instalar.sh
 
 O instalador cria o ambiente Python (homr, Flask, waitress…), baixa o Audiveris 5.11 e os dados de OCR, tudo dentro de `conversor/`, e oferece um atalho no menu de aplicativos.
 
-Para transcrever áudio (opcional, cerca de 6 GB): `conversor/instalar.sh --audio`. Ele cria um ambiente Python 3.12 com PyTorch (usa a placa de vídeo NVIDIA, se houver) e baixa o modelo de separação "MVSep Mega 53 Stems" (BS-RoFormer) e o Beat This!, conferindo a assinatura SHA-256 de cada um. Precisa do `ffmpeg`.
+Para transcrever áudio (opcional; ocupa cerca de 7,5 GB e precisa de uns 12 GB livres durante a instalação): `conversor/instalar.sh --audio`. Ele cria um ambiente Python 3.12 com PyTorch (usa a placa de vídeo NVIDIA, se houver), com as versões fixadas e o hash de cada pacote em `conversor/requisitos-audio.txt`, e baixa o modelo de separação "MVSep Mega 53 Stems" (BS-RoFormer) e o Beat This!, conferindo o SHA-256 de cada um. Precisa do `ffmpeg`; o `aria2c`, se instalado, acelera os downloads grandes. Para atualizar só o yt-dlp (importar por link): `conversor/instalar.sh --atualizar-yt-dlp`.
 
 ## Uso
 

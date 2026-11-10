@@ -254,5 +254,43 @@ class TestPontaAPonta(Base):
         self.assertEqual(r.status_code, 206)
         r.close()
 
+
+def _vivo(pid):
+    try:
+        estado = Path(f'/proc/{pid}/status').read_text()
+    except OSError:
+        return False
+    return '\nState:\tZ' not in estado
+
+
+class TestDownloadDeVerdade(Base):
+    """Trabalhador de áudio real (trabalho.py → baixar.py) com o yt-dlp falso: cancelar na fila encerra o yt-dlp
+    também, porque ele fica no grupo de processos do trabalho."""
+
+    def test_cancelar_encerra_o_yt_dlp(self):
+        from testes.test_audio_baixar import YT_DLP_FALSO
+        yt = self.tmp / 'yt-dlp'
+        yt.write_text(YT_DLP_FALSO.replace('PYTHON', sys.executable))
+        yt.chmod(0o755)
+        args = self.tmp / 'args.json'
+        self.fila.comando_audio = lambda t: [sys.executable, '-m', 'partituras.audio.trabalho', str(t)]
+        ambiente = {'FALSO_ARGS': str(args), 'FALSO_AMOSTRA': str(self.tmp / 'nao-usada.webm'),
+                    'CENTRAL_PARTITURAS_RAIZ': str(self.tmp / 'raiz')}
+        with mock.patch('partituras.fila.audio_disponivel.yt_dlp', return_value=str(yt)), \
+                mock.patch.dict(os.environ, ambiente):
+            r = self.envia('post', '/api/audio/link', json={'url': 'https://www.youtube.com/watch?v=abc&x=/mudo'})
+            self.assertEqual(r.status_code, 201, r.get_json())
+            mid = r.get_json()['musica']['id']
+            pid_arq = Path(f'{args}.pid')
+            self.assertTrue(esperar(pid_arq.exists, 30), 'o yt-dlp falso não começou')
+            pid = int(pid_arq.read_text())
+            self.assertTrue(_vivo(pid))
+            atual = self.fila.estado()['atual']
+            self.assertEqual((atual['tipo'], atual['musica']), ('baixar', mid))
+            self.assertEqual(self.envia('delete', f"/api/fila/{atual['id']}").status_code, 200)
+            self.assertTrue(esperar(lambda: not _vivo(pid), 15), 'o yt-dlp ficou rodando depois de cancelar')
+            self.assertTrue(esperar(lambda: self.fila.estado()['atual'] is None, 15))
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -30,12 +30,15 @@ Tudo fica dentro desta pasta: `.venv/` (Python 3.14 com homr, Flask, waitress…
 | `partituras/notacao.py` | notação compacta → MusicXML (transcrições assistidas) |
 | `partituras/static/` | interface (HTML/CSS/JS sem framework; cores da paleta validada da skill dataviz) |
 | `ferramentas/` | `gerar_manual.py` (MANUAL.pdf), `guias.py` e `listar_mxl.py` (ferramentas da revisão) |
+| `partituras/audio/` | modo de áudio. Leves (rodam no servidor): `instrumentos` (o parâmetro central: stem, faixa de busca, segmentação, transposição, clave, som), `fonte` (ffprobe, hash), `disponivel`, `mega53` (hiperparâmetros e arquivos com SHA-256), `baixar` (yt-dlp), `trabalho` (trabalhador da fila). Pesados (só no `.venv-audio`): `decodificar`, `separar` (só os stems pedidos, trechos com transição, reserva por falta de memória, cache atômico), `transcricao` (`analisar` → `gerar`), `linha`, `ritmo`, `partitura`, `conferencia`; `bs_roformer/` é a rede vendorizada (MIT) |
 | `testes/` | `unittest`; as saídas reais dos motores ficam em `testes/dados/`, fora do repositório (ver Testes) |
 
 ## Testes
 
 ```
 .venv/bin/python -m unittest discover -s testes -v
+.venv-audio/bin/python -m unittest discover -s testes -t . -p 'test_audio*'     # testes que precisam do ambiente de áudio
+CENTRAL_PY_AUDIO=$PWD/.venv-audio/bin/python .venv/bin/python -m unittest testes.test_servidor_audio   # ponta a ponta API → fila → trabalhador
 ```
 
 As referências em `testes/dados/` são leituras reais de uma partitura protegida por direitos autorais (uma foto de celular, as leituras do homr e do Audiveris e a transcrição revisada) e não vão para o repositório. Sem elas, os testes que as usam são pulados; os demais rodam normalmente.

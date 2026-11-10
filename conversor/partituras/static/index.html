@@ -19,10 +19,12 @@
   </nav>
   <div class="acoes-topo">
     <button class="botao primario" id="bt-importar">+ Importar fotos ou PDF</button>
+    <button class="botao" id="bt-importar-audio">♫ Importar áudio</button>
     <button class="botao fantasma" id="bt-ajuda">Ajuda</button>
     <button class="botao fantasma icone" id="bt-tema" title="Trocar tema claro/escuro" aria-label="Trocar tema claro/escuro">◐</button>
   </div>
   <input type="file" id="arquivos" multiple accept=".heic,.heif,.jpg,.jpeg,.png,.tif,.tiff,.webp,.bmp,.pdf" hidden>
+  <input type="file" id="arquivos-audio" accept="audio/*,.webm,.mka,.opus,.m4a" hidden>
 </header>
 
 <section class="kpis" id="kpis" aria-label="Resumo"></section>
@@ -44,10 +46,11 @@
 
 <footer class="fila" id="fila" aria-live="polite"></footer>
 
-<div class="soltar" id="soltar" hidden><div>Solte as fotos ou PDFs para importar</div></div>
+<div class="soltar" id="soltar" hidden><div>Solte as fotos, os PDFs ou um áudio para importar</div></div>
 <div class="dica" id="dica" role="tooltip" hidden></div>
 <dialog id="dialogo" aria-modal="true"></dialog>
 <div class="avisos" id="avisos" aria-live="assertive"></div>
+<script src="/static/audio.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

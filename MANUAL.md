@@ -139,26 +139,53 @@ Para músicas importantes ou difíceis, a Central prepara tudo para uma revisão
 
 **Exportar .zip** (na música) ou **Exportar selecionadas** (na lista) cria um único arquivo em `exportados/` com o `.mscz` e o PDF (o arquivo revisado, se houver), e — se marcado — as fotos em ordem (`pagina-01`, `pagina-02`…), o relatório, o MusicXML, a transcrição, as guias e os registros técnicos. Nunca sobrescreve pacotes anteriores.
 
-## 14. Dicas de captura
+## 14. Transcrever um áudio (sax, trompete, trombone)
+
+Além de fotos, a Central transcreve a linha de **um instrumento** numa gravação: ela separa o instrumento do resto da música, acha os trechos em que ele toca, lê as notas e escreve a parte já transposta para o instrumento escolhido.
+
+**Instalação (uma vez):** rode `conversor/instalar.sh --audio`. Ele cria um ambiente próprio (cerca de 6 GB, dentro de `conversor/`) e baixa os modelos de separação e de pulsação, conferindo a assinatura de cada um. Enquanto faltar algo, o diálogo de importação avisa o quê.
+
+**Importar:** clique em **♫ Importar áudio** (ou arraste um arquivo de áudio para a janela). Escolha o arquivo — MP3, WAV, FLAC, M4A, OGG, WEBM… — ou cole o **link** de um vídeo (um só, sem playlists). Dê o título, escolha o **instrumento a transcrever** (sax tenor, alto, soprano ou barítono, trompete em Si♭ ou trombone; a escolha fica lembrada) e deixe marcado **Separar e transcrever em seguida**.
+
+O instrumento direciona tudo: qual parte da gravação separar, em que região procurar as notas e como escrever a parte (transposição, clave, armadura). Trocar o instrumento depois não exige separar de novo: a Central guarda separados o sax, o trompete, o trombone e a voz de cada música.
+
+**Quanto demora:** a separação leva cerca de **3 vezes a duração da música** numa placa de vídeo de 4 GB (uma música de 5 minutos, uns 15 minutos), uma vez por música. A transcrição leva cerca de um minuto, e os ajustes, segundos. Tudo roda na fila, como as fotos: pode fechar a janela.
+
+![Relatório de um áudio, com a linha do tempo dos trechos e o player](conversor/partituras/static/manual/tela-audio.jpg)
+
+**O relatório de um áudio** mostra:
+
+- os números: trechos encontrados, notas (e quantas de baixa confiança), andamento e compasso, tom da parte (e em som real) e notas fora da extensão normal do instrumento;
+- a **linha do tempo** da música com os trechos em que o instrumento toca — clique num trecho para ouvir;
+- a lista de trechos, com o tempo na gravação, os compassos na partitura (para achar no MuseScore) e três botões de escuta: **Gravação**, **Só o sax** (o instrumento isolado) e **Transcrição + gravação** (a transcrição sintetizada tocando junto com a gravação — onde não bate, tem erro). **Ver curva** mostra a curva de altura com as notas;
+- **Ajustes**: tirar da partitura um trecho que não é do instrumento, trocar o compasso, deslocar o 1º tempo, corrigir o andamento (dobro ou metade) e a menor figura (semicolcheia ou colcheia). **Refazer transcrição** gera uma nova versão em segundos, sem separar de novo.
+
+Depois, **Abrir no MuseScore** e corrigir o que faltar — normalmente ligaduras e poucas notas. A transcrição não traz dinâmicas, articulações nem efeitos (bends, quedas, growl): acrescente no MuseScore.
+
+**Dicas:** prefira um arquivo seu ou comprado **sem perdas** (o áudio do YouTube tem perdas — serve, mas é o teto); funciona melhor quando o instrumento aparece em evidência, com pulsação estável. Se a Central disser que **não encontrou o instrumento**, veja a "presença na gravação" no bloco Áudio e troque o instrumento.
+
+**Direitos autorais (não é parecer):** os Termos do YouTube não permitem baixar fora dos recursos do próprio site — usar o link fica por sua conta. Transcrever para estudar é zona cinzenta; compartilhar, publicar ou tocar em público um arranjo de música protegida exige autorização (Lei 9.610/98).
+
+## 15. Dicas de captura
 
 - O melhor é **scanner de mesa** (Simple Scan, 300–400 dpi, tons de cinza).
 - Com celular: papel bem plano, luz difusa sem sombra, câmera paralela à folha, uma página por foto, a folha enchendo o quadro. O modo documento de apps como Google Drive ou Microsoft Lens ajuda.
 - Fotos tiradas em sequência, uma música de cada vez, deixam o agrupamento automático certo.
 
-## 15. Onde ficam os arquivos
+## 16. Onde ficam os arquivos
 
 | Pasta | O que tem |
 |---|---|
 | `entrada/` | caixa de entrada: fotos ainda sem música |
-| `musicas/<música>/` | fotos (`paginas/`), conversões com relatórios e registros (`conversoes/`), pacotes de revisão e transcrição |
+| `musicas/<música>/` | fotos (`paginas/`) ou áudio (`audio/`: o original, a mistura e os instrumentos separados), conversões com relatórios e registros (`conversoes/`), pacotes de revisão e transcrição |
 | `partituras/` | os `.mscz` e PDFs gerados (saída padrão) |
 | `exportados/` | os pacotes `.zip` |
-| `conversor/` | o programa e os motores (homr, Audiveris) — pode ser reinstalado com `instalar.sh` |
+| `conversor/` | o programa e os motores (homr, Audiveris; no modo de áudio, `.venv-audio` e `modelos-audio`) — pode ser reinstalado com `instalar.sh` |
 | `.estado/` | dados internos do programa |
 
 **Backup**: copie `musicas/`, `partituras/`, `exportados/` e `entrada/`. O resto se reinstala.
 
-## 16. Linha de comando (avançado)
+## 17. Linha de comando (avançado)
 
 Na pasta `conversor/`:
 
@@ -171,7 +198,7 @@ Na pasta `conversor/`:
 
 `--corrigir` usa a numeração dos trechos de pausa do relatório. Uma transcrição em notação compacta gera o `.mscz` com `.venv/bin/python -m partituras.notacao arquivo.py -o saida.musicxml --mscz saida.mscz --pdf`.
 
-## 17. Problemas comuns
+## 18. Problemas comuns
 
 - **"Sessão encerrada" ou a página não responde**: o programa foi fechado. Feche a janela e abra pelo atalho de novo.
 - **A janela de escolher pasta não apareceu**: ela pode ter aberto atrás da Central; procure na barra de tarefas.
@@ -180,4 +207,7 @@ Na pasta `conversor/`:
 - **Foto de cabeça para baixo ou deitada**: use **↻** na caixa de entrada ou nas páginas da música, antes de converter.
 - **Música "Interrompida"**: o programa foi fechado durante a conversão; converta de novo.
 - **Fotos de câmeras de muitos megapixels**: o Audiveris não aceita páginas acima de 20 megapixels; a Central reduz as fotos sozinha antes de enviar.
+- **"O modo de áudio não está instalado"**: rode `conversor/instalar.sh --audio`.
+- **Separação de áudio lenta ou "memória da GPU insuficiente"**: a Central diminui os trechos sozinha e, em último caso, usa o processador (bem mais lento). Fechar outros programas que usam a placa de vídeo ajuda.
+- **O link não baixa**: o yt-dlp quebra quando o site muda; atualize com `conversor/instalar.sh --atualizar-yt-dlp`.
 - **Detalhes técnicos de um erro**: `musicas/<música>/conversoes/<data>/logs/` e `.estado/servidor.log`.

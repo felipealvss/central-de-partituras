@@ -276,7 +276,8 @@ def criar_app(b, fila, token):
             h = fonte_audio.identificar(tmp)
             existente = b.audios_por_hash().get(h)
             if existente:
-                return erro(409, f'Este áudio já foi importado (música "{existente}").', onde=existente)
+                titulo = (b.ler(existente) or {}).get('titulo') or existente
+                return erro(409, f'Este áudio já foi importado, na música “{titulo}”.', onde=existente)
             try:
                 info = fonte_audio.sondar(tmp)
             except ErroConversao as e:

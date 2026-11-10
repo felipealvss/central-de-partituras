@@ -290,3 +290,26 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 }
 .aviso.erro { border-left-color: var(--critico); }
 .aviso.ok { border-left-color: var(--bom); }
+
+/* ---- modo de áudio */
+.importar-audio { display: grid; gap: 10px; min-width: min(560px, 80vw); }
+.trechos-audio { display: grid; gap: 8px; margin: 10px 0; }
+.trecho-audio { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center; padding: 8px 10px;
+  border: 1px solid var(--linha); border-radius: var(--raio); }
+.trecho-audio .barra-acoes { grid-column: 1 / -1; }
+.trecho-audio.fora { opacity: .6; border-style: dashed; }
+.trecho-incluir { display: flex; align-items: center; gap: 6px; }
+.linha-tempo { width: 100%; height: 64px; display: block; }
+.linha-tempo rect { cursor: pointer; }
+.linha-tempo rect:focus { outline: none; stroke: var(--tinta); stroke-width: 2.5; }
+.legenda .amostra { display: inline-block; width: 14px; height: 10px; border-radius: 2px; border: 1.5px solid var(--destaque); vertical-align: middle; }
+.legenda .amostra.cheia { background: var(--destaque); }
+.legenda .amostra.vazia { background: var(--superficie); }
+.legenda { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
+.player-audio { position: fixed; right: 16px; bottom: 64px; z-index: 30; display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio);
+  box-shadow: 0 4px 16px rgb(0 0 0 / .15); max-width: calc(100vw - 32px); }
+.player-audio[hidden] { display: none; }
+body.tocando .avisos { bottom: 116px; }
+span.rotulo { display: block; font-size: 12px; color: var(--tinta-2); margin-bottom: 4px; }
+.ajustes-audio .barra-acoes { flex-wrap: wrap; gap: 12px; }

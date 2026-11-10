@@ -36,6 +36,7 @@ const est = {
   fila: { atual: null, fila: [] }, motores: {}, revisoes: null, entradaQtd: -1, saidaPadrao: '',
   entrada: { fotos: [], grupos: [], limiar: 90 }, grupos: null, selecaoExport: new Set(),
   conferencias: {}, tabela: {}, pendente: false, correcoes: {},
+  ajustes: {}, instrumentos: [], instrumentoPadrao: 'sax-tenor', audio: {},
 };
 
 async function api(metodo, url, corpo) {
@@ -79,6 +80,7 @@ const ESTADOS = {
   nova: ['Nova', 'circulo'], na_fila: ['Na fila', 'relogio'], convertendo: ['Convertendo', 'gira'],
   rascunho: ['Rascunho', 'documento'], rascunho_alertas: ['A revisar', 'aviso'], revisada: ['Revisada', 'certo'],
   erro: ['Erro', 'erro'], cancelada: ['Cancelada', 'pausa'], interrompida: ['Interrompida', 'pausa'],
+  baixando: ['Baixando', 'gira'],
 };
 function icone(nome) {
   const s = svg('svg', { viewBox: '0 0 16 16', 'aria-hidden': 'true' });
@@ -121,6 +123,8 @@ async function carregarMusicas() {
   est.musicas = d.musicas;
   est.saidaPadrao = d.saida_padrao;
   est.casa = d.casa || '';
+  est.instrumentos = d.instrumentos_audio || [];
+  est.instrumentoPadrao = d.instrumento_padrao || 'sax-tenor';
   if (!est.selecionada && est.musicas.length) est.selecionada = est.musicas[0].id;
   renderLista(); renderKPIs(); renderEditor();
 }
@@ -179,7 +183,7 @@ function renderLista() {
   const lista = $('#lista');
   if (!ms.length) {
     lista.replaceChildren(el('li', { class: 'vazio' }, est.musicas.length ? 'Nenhuma música neste filtro.' :
-      'Nenhuma música ainda. Importe fotos e crie músicas na Caixa de entrada.'));
+      'Nenhuma música ainda. Importe fotos (e crie músicas na Caixa de entrada) ou importe um áudio.'));
   } else {
     lista.replaceChildren(...ms.map(m => {
       const marcado = est.selecaoExport.has(m.id);
@@ -193,7 +197,7 @@ function renderLista() {
         onchange: e => { e.target.checked ? est.selecaoExport.add(m.id) : est.selecaoExport.delete(m.id); atualizarExportSel(); },
       }),
       el('div', {}, el('div', { class: 'titulo', text: m.titulo }),
-        el('div', { class: 'sub', text: [m.instrumento, `${m.paginas.length} página(s)`].filter(Boolean).join(' · ') }),
+        el('div', { class: 'sub', text: [m.instrumento, m.fonte === 'audio' ? `áudio${m.audio && m.audio.duracao ? ` ${mmss(m.audio.duracao)}` : ''}` : `${m.paginas.length} página(s)`].filter(Boolean).join(' · ') }),
         status(m.estado)));
     }));
   }
@@ -245,12 +249,15 @@ function renderEditor(forcar = false) {
   const m = musicaSel();
   if (!m) {
     ed.replaceChildren(el('div', { class: 'vazio' }, el('h2', { text: 'Bem-vindo à Central de Partituras' }),
-      el('p', {}, 'Importe as fotos das partituras (botão “Importar” ou arraste para esta janela). Elas vão para a Caixa de entrada, onde você agrupa as fotos por música.')));
+      el('p', {}, 'Importe as fotos das partituras (botão “Importar fotos” ou arraste para esta janela): elas vão para a Caixa de entrada, onde você agrupa as fotos por música.'),
+      el('p', {}, 'Ou importe uma gravação (botão “Importar áudio”): a Central separa o instrumento escolhido e transcreve a parte dele.')));
     return;
   }
   const rolagem = ed.scrollTop;
-  ed.replaceChildren(...limpos([cabecalho(m), blocoFinal(m), blocoPaginas(m), blocoDados(m), blocoConversao(m),
-    blocoRelatorio(m), blocoRevisaoClaude(m), blocoHistorico(m)]));
+  ed.replaceChildren(...limpos(m.fonte === 'audio'
+    ? [cabecalho(m), blocoFinal(m), blocoAudio(m), blocoDadosAudio(m), blocoConversaoAudio(m), blocoRelatorio(m), blocoHistorico(m)]
+    : [cabecalho(m), blocoFinal(m), blocoPaginas(m), blocoDados(m), blocoConversao(m), blocoRelatorio(m), blocoRevisaoClaude(m),
+      blocoHistorico(m)]));
   ed.scrollTop = rolagem;
 }
 
@@ -285,8 +292,8 @@ function cabecalho(m) {
       el('div', { class: 'apagado pequeno', text: [m.instrumento, m.compositor].filter(Boolean).join(' · ') || 'Preencha instrumento e compositor abaixo' })),
     status(m.estado, true),
     el('div', { class: 'barra-acoes' },
-      el('button', { class: 'botao primario', disabled: !m.paginas.length || ocupada(m), onclick: () => converter(m) },
-        ocupada(m) ? 'Na fila…' : '▶ Converter'),
+      el('button', { class: 'botao primario', disabled: (m.fonte === 'audio' ? (m.audio || {}).estado !== 'pronto' : !m.paginas.length) || ocupada(m),
+        onclick: () => converter(m) }, ocupada(m) ? 'Na fila…' : m.fonte === 'audio' ? '▶ Separar e transcrever' : '▶ Converter'),
       el('button', { class: 'botao', onclick: () => dialogoExportar([m.id]) }, 'Exportar .zip'),
       el('button', { class: 'botao fantasma perigo', onclick: () => excluir(m) }, 'Excluir')));
 }
@@ -430,7 +437,7 @@ async function escolherPasta(m) {
   } catch (e) { falhou(e); }
 }
 async function excluir(m) {
-  if (!confirm(`Mandar “${m.titulo}” (fotos e conversões) para a Lixeira?\nOs arquivos já salvos na pasta de saída não são apagados.`)) return;
+  if (!confirm(`Mandar “${m.titulo}” (${m.fonte === 'audio' ? 'áudio' : 'fotos'} e conversões) para a Lixeira?\nOs arquivos já salvos na pasta de saída não são apagados.`)) return;
   try {
     await api('DELETE', `/api/musicas/${enc(m.id)}`);
     est.selecionada = null;
@@ -473,12 +480,12 @@ function relatorioConversao(m, c) {
   const chave = `${m.id}/${c.id}/${v.n}`;
   const caixa = el('div', {},
     el('div', { class: 'relatorio-cab' },
-      el('strong', { text: c.motor === 'homr' ? 'homr' : 'Audiveris' }),
+      el('strong', { text: rotuloMotor(c) }),
       el('span', { class: 'apagado pequeno', text: `${hora(v.quando)} · versão ${v.n}` }),
       botoesArquivo(m, v.publicados)));
   const corpo = el('div', {}, el('p', { class: 'apagado', text: 'Carregando relatório…' }));
   caixa.append(corpo);
-  const preencher = rel => corpo.replaceChildren(...limpos(conteudoRelatorio(m, c, rel, chave)));
+  const preencher = rel => corpo.replaceChildren(...limpos(rel.tipo === 'audio' ? relatorioAudio(m, c, rel, chave) : conteudoRelatorio(m, c, rel, chave)));
   if (est.conferencias[chave]) preencher(est.conferencias[chave]);
   else api('GET', `/api/musicas/${enc(m.id)}/conversoes/${enc(c.id)}/versoes/${v.n}/conferencia`)
     .then(rel => { est.conferencias[chave] = rel; preencher(rel); })
@@ -752,10 +759,14 @@ const ITENS_CHECKLIST = [
   ['dinamicas', 'Dinâmicas, andamentos, rit./a tempo e fermatas acrescentados'],
   ['ouvida', 'Ouvi a música no MuseScore'],
 ];
+function rotuloMotor(c) {
+  return c.motor === 'audio' ? `Áudio · ${nomeInstrumento(c.instrumento)}` : c.motor === 'homr' ? 'homr' : 'Audiveris';
+}
 function checklist(m) {
-  const tudo = ITENS_CHECKLIST.every(([k]) => m.checklist[k]);
+  const ITENS_CHECKLIST_ = m.fonte === 'audio' ? ITENS_CHECKLIST_AUDIO : ITENS_CHECKLIST;
+  const tudo = ITENS_CHECKLIST_.every(([k]) => m.checklist[k]);
   return el('div', {}, el('h4', { style: 'margin:18px 0 4px', text: 'Revisão no MuseScore' }),
-    el('div', { class: 'checklist' }, ITENS_CHECKLIST.map(([k, rotulo]) => el('label', {},
+    el('div', { class: 'checklist' }, ITENS_CHECKLIST_.map(([k, rotulo]) => el('label', {},
       el('input', { type: 'checkbox', checked: !!m.checklist[k], onchange: e => salvar(m, { checklist: { ...m.checklist, [k]: e.target.checked } }) }), rotulo))),
     m.revisada
       ? el('button', { class: 'botao', onclick: () => salvar(m, { revisada: false }) }, 'Desmarcar “Revisada”')
@@ -794,7 +805,7 @@ function blocoHistorico(m) {
     const situacao = c.estado === 'ok' ? (v && v.resumo && v.resumo.alertas ? 'rascunho_alertas' : 'rascunho') : c.estado;
     return el('tr', {},
       el('td', { text: hora(c.quando) }),
-      el('td', { text: c.motor === 'homr' ? 'homr' : 'Audiveris' }),
+      el('td', { text: rotuloMotor(c) }),
       el('td', {}, c.estado === 'legado' ? el('span', { class: 'apagado', text: c.nota || 'antiga' }) : status(situacao)),
       el('td', { class: 'num', text: c.versoes.length || '—' }),
       el('td', { class: 'num', text: v && v.resumo ? `${v.resumo.total}${v.resumo.esperado ? ` / ${v.resumo.esperado}` : ''}` : '—' }),
@@ -857,7 +868,7 @@ function renderEntrada(forcar = false) {
         est.musicas.length ? el('select', { class: 'campo', style: 'width:auto', 'aria-label': 'Adicionar a uma música existente',
           onchange: e => { if (e.target.value) adicionarAMusica(e.target.value, g.fotos.slice()); } },
           el('option', { value: '' }, 'Adicionar a uma música…'),
-          est.musicas.map(m => el('option', { value: m.id, text: m.titulo }))) : null,
+          est.musicas.filter(m => m.fonte !== 'audio').map(m => el('option', { value: m.id, text: m.titulo }))) : null,
         el('button', { class: 'botao primario mini', onclick: () => criarGrupos([g]) }, 'Criar música'))),
     el('div', { class: 'fotos-grupo' }, g.fotos.map((a, fi) => {
       const f = fotos.get(a);
@@ -966,9 +977,11 @@ function renderFila() {
     const p = a.progresso || {};
     const det = p.i && p.n;
     const tempo = `${Math.floor(a.segundos / 60)}:${String(a.segundos % 60).padStart(2, '0')}`;
-    const rotulo = a.tipo === 'revisao' ? 'Preparando revisão' : a.tipo === 'acabar' ? 'Refazendo acabamento' : 'Convertendo';
+    const audio = a.ambiente === 'audio';
+    const rotulo = a.tipo === 'revisao' ? 'Preparando revisão' : a.tipo === 'baixar' ? 'Baixando'
+      : a.tipo === 'acabar' ? (audio ? 'Refazendo a transcrição' : 'Refazendo acabamento') : audio ? 'Separando e transcrevendo' : 'Convertendo';
     partes.push(el('span', { class: 'status' }, icone('gira'), rotulo),
-      el('span', {}, el('strong', { text: a.titulo }), ` · ${a.motor} · ${p.msg || ''} · `, el('span', { class: 'num', text: tempo })),
+      el('span', {}, el('strong', { text: a.titulo }), ` · ${audio ? 'áudio' : a.motor} · ${p.msg || ''} · `, el('span', { class: 'num', text: tempo })),
       el('div', { class: `progresso${det ? '' : ' indeterminado'}`, role: 'progressbar', 'aria-label': 'Progresso' },
         el('div', { style: `width:${det ? Math.round((p.i - 0.5) / p.n * 100) : 30}%` })),
       el('button', { class: 'botao mini', onclick: () => api('DELETE', `/api/fila/${enc(a.id)}`).then(() => aviso('Cancelando…')).catch(falhou) }, 'Cancelar'));
@@ -1100,8 +1113,16 @@ function iniciarArrastar() {
   window.addEventListener('drop', e => {
     if (!temArquivos(e)) return;
     e.preventDefault(); profundidade = 0; $('#soltar').hidden = true;
+    const arquivos = [...e.dataTransfer.files];
+    const audios = arquivos.filter(a => eAudio(a.name));
+    if (audios.length) {
+      if (audios.length > 1) aviso('Importe um áudio por vez: abri o primeiro.', 'erro');
+      dialogoImportarAudio(audios[0]);
+    }
+    const outros = arquivos.filter(a => !eAudio(a.name));
+    if (!outros.length) return;
     const destino = est.vista === 'musicas' && e.target.closest && e.target.closest('.paginas') ? est.selecionada : null;
-    importar([...e.dataTransfer.files], destino);
+    importar(outros, destino);
   });
 }
 
@@ -1112,6 +1133,7 @@ async function ciclo() {
     const e = await api('GET', '/api/estado');
     est.fila = e.fila;
     est.motores = e.motores;
+    est.audio = e.audio || {};
     const mudou = JSON.stringify(e.revisoes) !== JSON.stringify(est.revisoes);
     est.revisoes = e.revisoes;
     if (e.entrada !== est.entradaQtd) { est.entradaQtd = e.entrada; await carregarEntrada(); }
@@ -1141,6 +1163,7 @@ async function iniciar() {
   bt.onclick = trocarTema;
   $('#bt-ajuda').onclick = ajuda;
   $('#bt-importar').onclick = () => escolherArquivos(null);
+  $('#bt-importar-audio').onclick = () => dialogoImportarAudio(null);
   $('#bt-exportar-sel').onclick = () => dialogoExportar([...est.selecaoExport]);
   $('#busca').oninput = e => { est.busca = e.target.value; renderLista(); };
   for (const b of document.querySelectorAll('.abas button')) b.onclick = () => mostrarVista(b.dataset.vista);
